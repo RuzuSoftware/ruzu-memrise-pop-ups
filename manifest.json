@@ -4,20 +4,20 @@
   "name": "Ruzu Memrise pop-ups",
   "description": "Chrome extension that periodically presents memrise tests via notifications.",
   "version": "1.0",
-  "browser_action": {
-    "default_icon": "icon.png",
-    "default_popup": "index.html",
-    "default_title": "Ruzu Memrise pop-ups"
-  },
   "options_ui": {
     "page": "options.html",
     "chrome_style": true
+  },
+  "background": {
+    "scripts": ["notification.js"],
+    "persistent": true
   },
   "icons": { "16": "icon.png",
              "48": "icon.png",
             "128": "icon.png" },
   "permissions": [
     "storage",
-    "notifications"
+    "notifications",
+    "alarms"
   ]
 }
