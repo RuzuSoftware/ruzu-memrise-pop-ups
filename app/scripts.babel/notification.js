@@ -1,3 +1,5 @@
+'use strict';
+
 // Copyright (c) 2016 Ruzu. All rights reserved.
 var not_list = [];
 var questions = [];

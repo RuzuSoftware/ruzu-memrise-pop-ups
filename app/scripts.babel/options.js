@@ -1,3 +1,5 @@
+'use strict';
+
 // Saves options to chrome.storage.sync.
 function save_options() {
   var frequencyVal = document.getElementById('frequency').value;
