@@ -12,14 +12,16 @@
   "background": {
     "scripts": [
       "scripts/chromereload.js",
-      "scripts/notification.js"
+      "scripts/notification.js",
+      "bower_components/jquery/dist/jquery.min.js"
     ],
     "persistent": true
   },
   "permissions": [
     "storage",
     "notifications",
-    "alarms"
+    "alarms",
+    "http://www.memrise.com/*"
   ],
   "options_ui": {
     "page": "options.html",
