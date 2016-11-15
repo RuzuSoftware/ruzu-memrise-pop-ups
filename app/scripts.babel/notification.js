@@ -14,16 +14,32 @@ function prepQuestions(callback) {
       // JSON.parse does not evaluate the attacker's scripts.
       var resp = JSON.parse(xhr.responseText);
       qnum = 0;
+
       for (var i = 0; i < resp.boxes.length; i++) {
+        var orderArr = []
+        while (orderArr.length < 4) {
+          var randomnumber = Math.ceil(Math.random() * 4)
+          if (orderArr.indexOf(randomnumber) > -1) continue;
+          orderArr[orderArr.length] = randomnumber;
+        }
+
+        var valueArr = []
+        while (valueArr.length < 3) {
+          var randomnumber = Math.ceil(Math.random() * resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices.length) - 1
+          if (valueArr.indexOf(randomnumber) > -1) continue;
+          valueArr[valueArr.length] = randomnumber;
+        }
+
         questions[i] = {
           question: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].val,
           answer: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].val,
-          choice1: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices[0],
-          choice2: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices[1],
-          choice3: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices[2],
-          choice4: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].val,
           options: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices
         }
+        questions[i]['choice' + orderArr[0]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices[valueArr[0]];
+        questions[i]['choice' + orderArr[1]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices[valueArr[1]];
+        questions[i]['choice' + orderArr[2]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices[valueArr[2]];
+        questions[i]['choice' + orderArr[3]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].val;
+
       }
       if (callback) {
         callback(null);
@@ -187,6 +203,19 @@ chrome.alarms.onAlarm.addListener(function(alarm) {
   }
 });
 
+chrome.storage.onChanged.addListener(function(changes, namespace) {
+  for (var key in changes) {
+    var storageChange = changes[key];
+    console.log('Storage key ' + key + ' in namespace ' + namespace + ' changed. ' +
+      'Old value was ' + storageChange.oldValue + ', new value is ' + storageChange.newValue + '.');
+    if ((key == 'enabled' || key == 'frequency') && storageChange.oldValue != storageChange.newValue) {
+      console.log('Reset Alarm...');
+      checkAlarm('Ruzu', initialSetUp);
+      break;
+    }
+  }
+});
+
 function checkAlarm(alarmName, callback) {
   chrome.alarms.getAll(function(alarms) {
     var hasAlarm = alarms.some(function(a) {
@@ -230,7 +259,9 @@ function createAlarm(alarmName) {
 function initialSetUp(enabled, alarmExists) {
   if (alarmExists) {
     if (enabled) {
-      console.log('Alarm already exists.');
+      console.log('Alarm already exists, resetting alarm.');
+      cancelAlarm('Ruzu');
+      createAlarm('Ruzu');
     } else {
       console.log('Ruzu Memrise pop-ups disabled, disabling alarm.');
       cancelAlarm('Ruzu');
