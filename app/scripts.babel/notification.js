@@ -4,45 +4,60 @@
 var not_list = [];
 var questions = [];
 var qnum = 0;
+var totalQnums = 0;
+var error_not;
 
 function prepQuestions(callback) {
-  console.log('prepQuestions');
+
   var xhr = new XMLHttpRequest();
   xhr.open('GET', 'http://www.memrise.com/ajax/session/?course_id=479047&session_slug=review_course', true);
+
   xhr.onreadystatechange = function() {
+
     if (xhr.readyState == 4) {
+      var jsonOk = false;
       // JSON.parse does not evaluate the attacker's scripts.
-      var resp = JSON.parse(xhr.responseText);
-      qnum = 0;
-
-      for (var i = 0; i < resp.boxes.length; i++) {
-        var orderArr = []
-        while (orderArr.length < 4) {
-          var randomnumber = Math.ceil(Math.random() * 4)
-          if (orderArr.indexOf(randomnumber) > -1) continue;
-          orderArr[orderArr.length] = randomnumber;
-        }
-
-        var valueArr = []
-        while (valueArr.length < 3) {
-          var randomnumber = Math.ceil(Math.random() * resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices.length) - 1
-          if (valueArr.indexOf(randomnumber) > -1) continue;
-          valueArr[valueArr.length] = randomnumber;
-        }
-
-        questions[i] = {
-          question: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].val,
-          answer: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].val,
-          options: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices
-        }
-        questions[i]['choice' + orderArr[0]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices[valueArr[0]];
-        questions[i]['choice' + orderArr[1]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices[valueArr[1]];
-        questions[i]['choice' + orderArr[2]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].choices[valueArr[2]];
-        questions[i]['choice' + orderArr[3]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].val;
-
+      try {
+        var resp = JSON.parse(xhr.responseText);
+        jsonOk = true;
+      } catch (e) {
+        console.log('Error connecting to memrise.');
+        console.log(e);
+        errorNotifiction();
       }
-      if (callback) {
-        callback(null);
+      if (jsonOk) {
+        qnum = 0;
+        totalQnums = resp.boxes.length;
+
+        for (var i = 0; i < totalQnums; i++) {
+          var orderArr = []
+          while (orderArr.length < 4) {
+            var randomnumber = Math.ceil(Math.random() * 4)
+            if (orderArr.indexOf(randomnumber) > -1) continue;
+            orderArr[orderArr.length] = randomnumber;
+          }
+
+          var valueArr = []
+          while (valueArr.length < 3) {
+            var randomnumber = Math.ceil(Math.random() * resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices.length) - 1
+            if (valueArr.indexOf(randomnumber) > -1) continue;
+            valueArr[valueArr.length] = randomnumber;
+          }
+
+          questions[i] = {
+            question: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].val,
+            answer: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].val,
+            options: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices
+          }
+          questions[i]['choice' + orderArr[0]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices[valueArr[0]];
+          questions[i]['choice' + orderArr[1]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices[valueArr[1]];
+          questions[i]['choice' + orderArr[2]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices[valueArr[2]];
+          questions[i]['choice' + orderArr[3]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].val;
+
+        }
+        if (callback) {
+          callback(null);
+        }
       }
     }
   }
@@ -56,6 +71,7 @@ function popUpTest(question, trueAnswer, answer1, answer2, answer3, answer4) {
     type: 'basic',
     title: question,
     message: '',
+    contextMessage: (qnum + 1) + '/' + totalQnums,
     iconUrl: 'images/icon.png',
     buttons: [{
       title: answer1 + ' | ' + answer2,
@@ -159,6 +175,29 @@ function checkAnswer(ques, correct_ans, answer_in) {
 
 }
 
+function errorNotifiction() {
+
+  var options = {
+    type: 'basic',
+    title: 'Error!',
+    message: 'There was an issue connecting to Memrise.com',
+    contextMessage: 'Login to Memrise and click to try again.',
+    iconUrl: 'images/error_temp.png', //Needs better quality file
+    isClickable: true,
+    requireInteraction: true
+  };
+
+  chrome.notifications.create('', options, function(id) {
+    //Clear old error notification
+    if (error_not) {
+      chrome.notifications.clear(error_not);
+    }
+    //Record new error notification
+    error_not = id;
+  });
+
+}
+
 /* Respond to the user's clicking one of the buttons */
 chrome.notifications.onButtonClicked.addListener(function(notifId, btnIdx) {
 
@@ -190,7 +229,10 @@ chrome.notifications.onButtonClicked.addListener(function(notifId, btnIdx) {
 //Add listener for checkAnswer notification so that click to remove is possible
 chrome.notifications.onClicked.addListener(function(notifId) {
   validNotID(notifId, function(validNot) {
-    if (!validNot) {
+    if (!validNot && notifId != error_not) {
+      chrome.notifications.clear(notifId);
+    } else {
+      checkAlarm('Ruzu', initialSetUp);
       chrome.notifications.clear(notifId);
     }
   });
