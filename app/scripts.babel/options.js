@@ -2,11 +2,15 @@
 
 // Saves options to chrome.storage.sync.
 function save_options() {
+  var courseNameVal = $('#course option:selected').text();
+  var courseIDVal = document.getElementById('course').value;
   var frequencyVal = document.getElementById('frequency').value;
   var test_amtVal = document.getElementById('test_amt').value;
   var enabledVal = document.getElementById('enabled').checked;
   var syncVal = document.getElementById('sync').checked;
   chrome.storage.sync.set({
+    courseName: courseNameVal,
+    courseID: courseIDVal,
     frequency: frequencyVal,
     test_amt: test_amtVal,
     enabled: enabledVal,
@@ -21,22 +25,80 @@ function save_options() {
   });
 }
 
+function getCourses(callback) {
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'http://www.memrise.com/ajax/courses/dashboard/?courses_filter=most_recent&offset=0&limit=4&get_review_count=false', true);
+
+  xhr.onreadystatechange = function() {
+
+    if (xhr.readyState == 4) {
+      var jsonOk = false;
+      // JSON.parse does not evaluate the attacker's scripts.
+      try {
+        var resp = JSON.parse(xhr.responseText);
+        jsonOk = true;
+      } catch (e) {
+        console.log('Error connecting to memrise.');
+        console.log(e);
+        //errorNotifiction();
+      }
+      if (jsonOk) {
+        var courseSelect = $('#course');
+        courseSelect.empty();
+        for (var i = 0; i < resp.courses.length; i++) {
+          courseSelect.append(
+            $('<option></option>').val(resp.courses[i].id).html(resp.courses[i].name)
+          );
+        }
+        if (callback) {
+          callback(true);
+        }
+      } else {
+        if (callback) {
+          callback(false);
+        }
+      }
+    }
+  }
+  xhr.send();
+}
+
 // Restores select box and checkbox state using the preferences
 // stored in chrome.storage.
 function restore_options() {
   // Use default values if not set
   chrome.storage.sync.get({
+    courseName: '(Please select a course)',
+    courseID: 0,
     frequency: 5,
     test_amt: 1,
     enabled: true,
     sync: true
   }, function(items) {
-    document.getElementById('frequency').value = items.frequency;
-    document.getElementById('test_amt').value = items.test_amt;
-    document.getElementById('enabled').checked = items.enabled;
-    document.getElementById('sync').checked = items.sync;
+
+    getCourses(function(success) {
+      if (!success) {
+        var courseSelect = $('#course');
+        courseSelect.empty().append(
+          $('<option></option>').val('0').html('Error, please log into memrise.com')
+        );
+        $('#course_wrap').hide();
+        $('#course_error').show();
+      } else {
+        $('#course_wrap').show();
+        $('#course_error').hide();
+      }
+      document.getElementById('course').value = items.courseID;
+      document.getElementById('frequency').value = items.frequency;
+      document.getElementById('test_amt').value = items.test_amt;
+      document.getElementById('enabled').checked = items.enabled;
+      document.getElementById('sync').checked = items.sync;
+    });
   });
+
 }
 
 document.addEventListener('DOMContentLoaded', restore_options);
 document.getElementById('save').addEventListener('click', save_options);
+document.getElementById('tryAgain').addEventListener('click', restore_options);

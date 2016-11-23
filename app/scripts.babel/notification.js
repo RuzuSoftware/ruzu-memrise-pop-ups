@@ -6,62 +6,79 @@ var questions = [];
 var qnum = 0;
 var totalQnums = 0;
 var error_not;
+var course_id;
+var resp;
 
 function prepQuestions(callback) {
+  chrome.storage.sync.get({
+    courseID: 0
+  }, function(settings) {
+    console.log('Got course ID:' + settings.courseID);
+    course_id = (settings.courseID ? settings.courseID : 0);
+    var xhr = new XMLHttpRequest();
+    console.log('Connect to course...');
+    if (error_not) {
+      chrome.notifications.clear(error_not);
+    }
+    xhr.open('GET', 'http://www.memrise.com/ajax/session/?course_id=' + course_id + '&session_slug=review_course', true);
 
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', 'http://www.memrise.com/ajax/session/?course_id=479047&session_slug=review_course', true);
+    xhr.onreadystatechange = function() {
 
-  xhr.onreadystatechange = function() {
-
-    if (xhr.readyState == 4) {
-      var jsonOk = false;
-      // JSON.parse does not evaluate the attacker's scripts.
-      try {
-        var resp = JSON.parse(xhr.responseText);
-        jsonOk = true;
-      } catch (e) {
-        console.log('Error connecting to memrise.');
-        console.log(e);
-        errorNotifiction();
-      }
-      if (jsonOk) {
+      if (xhr.readyState == 4) {
+        var jsonOk = false;
         qnum = 0;
-        totalQnums = resp.boxes.length;
+        totalQnums = 0;
+        questions = [];
 
-        for (var i = 0; i < totalQnums; i++) {
-          var orderArr = []
-          while (orderArr.length < 4) {
-            var randomnumber = Math.ceil(Math.random() * 4)
-            if (orderArr.indexOf(randomnumber) > -1) continue;
-            orderArr[orderArr.length] = randomnumber;
+        // JSON.parse does not evaluate the attacker's scripts.
+        try {
+          resp = JSON.parse(xhr.responseText);
+          jsonOk = true;
+        } catch (e) {
+          console.log('Error connecting to memrise.');
+          console.log(e);
+          if (course_id == '0') {
+            errorNotifiction('invalid_course_id');
+          } else {
+            errorNotifiction(null);
           }
-
-          var valueArr = []
-          while (valueArr.length < 3) {
-            var randomnumber = Math.ceil(Math.random() * resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices.length) - 1
-            if (valueArr.indexOf(randomnumber) > -1) continue;
-            valueArr[valueArr.length] = randomnumber;
-          }
-
-          questions[i] = {
-            question: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].val,
-            answer: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].val,
-            options: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices
-          }
-          questions[i]['choice' + orderArr[0]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices[valueArr[0]];
-          questions[i]['choice' + orderArr[1]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices[valueArr[1]];
-          questions[i]['choice' + orderArr[2]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices[valueArr[2]];
-          questions[i]['choice' + orderArr[3]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].val;
-
         }
-        if (callback) {
-          callback(null);
+        if (jsonOk) {
+          totalQnums = resp.boxes.length;
+          for (var i = 0; i < totalQnums; i++) {
+            var orderArr = []
+            while (orderArr.length < 4) {
+              var randomnumber = Math.ceil(Math.random() * 4)
+              if (orderArr.indexOf(randomnumber) > -1) continue;
+              orderArr[orderArr.length] = randomnumber;
+            }
+
+            var valueArr = []
+            while (valueArr.length < 3) {
+              var randomnumber = Math.ceil(Math.random() * resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices.length) - 1
+              if (valueArr.indexOf(randomnumber) > -1) continue;
+              valueArr[valueArr.length] = randomnumber;
+            }
+
+            questions[i] = {
+              question: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].val,
+              answer: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].val,
+              options: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices
+            }
+            questions[i]['choice' + orderArr[0]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices[valueArr[0]];
+            questions[i]['choice' + orderArr[1]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices[valueArr[1]];
+            questions[i]['choice' + orderArr[2]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices[valueArr[2]];
+            questions[i]['choice' + orderArr[3]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].val;
+
+          }
+          if (callback) {
+            callback(null);
+          }
         }
       }
     }
-  }
-  xhr.send();
+    xhr.send();
+  });
 }
 
 function popUpTest(question, trueAnswer, answer1, answer2, answer3, answer4) {
@@ -140,11 +157,11 @@ function popUpTest2(notifId, question, answer1, answer2) {
       not_list[i].f2 = answer2;
     }
   }
-  console.log('notifications: ' + not_list);
+  // console.log('notifications: ' + not_list);
   chrome.notifications.update(notifId, options);
-  for (var i = 0; i < not_list.length; i++) {
-    console.log(not_list[i].notID);
-  }
+  // for (var i = 0; i < not_list.length; i++) {
+  //   console.log(not_list[i].notID);
+  // }
 
 }
 
@@ -175,17 +192,53 @@ function checkAnswer(ques, correct_ans, answer_in) {
 
 }
 
-function errorNotifiction() {
-
-  var options = {
-    type: 'basic',
-    title: 'Error!',
-    message: 'There was an issue connecting to Memrise.com',
-    contextMessage: 'Login to Memrise and click to try again.',
-    iconUrl: 'images/error_temp.png', //Needs better quality file
-    isClickable: true,
-    requireInteraction: true
-  };
+function errorNotifiction(error_type) {
+  var iconUrl = 'images/error_temp.png';
+  switch (error_type) {
+    case 'invalid_course_id':
+      var options = {
+        type: 'basic',
+        title: 'Error!',
+        message: 'There was an issue connecting to Memrise.com',
+        contextMessage: 'Select a course and click to try again.',
+        iconUrl: iconUrl,
+        isClickable: true,
+        requireInteraction: true,
+        buttons: [{
+          title: 'Options',
+        }]
+      };
+      break;
+    case 'no_results':
+      var options = {
+        type: 'basic',
+        title: 'Attention!',
+        message: 'No questions to review.',
+        contextMessage: 'Select other course or wait until later.',
+        iconUrl: 'images/icon.png',
+        isClickable: true,
+        requireInteraction: true,
+        buttons: [{
+          title: 'Select another course',
+        }]
+      };
+      break;
+    default:
+      var options = {
+        type: 'basic',
+        title: 'Error!',
+        message: 'There was an issue connecting to Memrise.com',
+        contextMessage: 'Login to Memrise and click to try again.',
+        iconUrl: iconUrl,
+        isClickable: true,
+        requireInteraction: true,
+        buttons: [{
+          title: 'Options',
+        }, {
+          title: 'Try Again',
+        }]
+      };
+  }
 
   chrome.notifications.create('', options, function(id) {
     //Clear old error notification
@@ -197,66 +250,6 @@ function errorNotifiction() {
   });
 
 }
-
-/* Respond to the user's clicking one of the buttons */
-chrome.notifications.onButtonClicked.addListener(function(notifId, btnIdx) {
-
-  validNotID(notifId, function(validNot) {
-    console.log('validNot: ');
-    console.log(validNot);
-    if (validNot && validNot.stage == 1) {
-      if (btnIdx === 0) {
-        popUpTest2(notifId, validNot.ques, validNot.a1, validNot.a2);
-      } else if (btnIdx === 1) {
-        popUpTest2(notifId, validNot.ques, validNot.a3, validNot.a4);
-      }
-    } else if (validNot && validNot.stage == 2) {
-      chrome.notifications.clear(notifId);
-      if (btnIdx === 0) {
-        checkAnswer(validNot.ques, validNot.ans, validNot.f1);
-        console.log('Check answer final ' + validNot.f1);
-      } else if (btnIdx === 1) {
-        checkAnswer(validNot.ques, validNot.ans, validNot.f2);
-        console.log('Check answer final ' + validNot.f2);
-      }
-    } else {
-      console.log('fail if');
-    }
-  });
-
-});
-
-//Add listener for checkAnswer notification so that click to remove is possible
-chrome.notifications.onClicked.addListener(function(notifId) {
-  validNotID(notifId, function(validNot) {
-    if (!validNot && notifId != error_not) {
-      chrome.notifications.clear(notifId);
-    } else {
-      checkAlarm('Ruzu', initialSetUp);
-      chrome.notifications.clear(notifId);
-    }
-  });
-});
-
-chrome.alarms.onAlarm.addListener(function(alarm) {
-  console.log('Got an alarm!', alarm);
-  if (alarm.name == 'Ruzu') {
-    showNextQuestion();
-  }
-});
-
-chrome.storage.onChanged.addListener(function(changes, namespace) {
-  for (var key in changes) {
-    var storageChange = changes[key];
-    console.log('Storage key ' + key + ' in namespace ' + namespace + ' changed. ' +
-      'Old value was ' + storageChange.oldValue + ', new value is ' + storageChange.newValue + '.');
-    if ((key == 'enabled' || key == 'frequency') && storageChange.oldValue != storageChange.newValue) {
-      console.log('Reset Alarm...');
-      checkAlarm('Ruzu', initialSetUp);
-      break;
-    }
-  }
-});
 
 function checkAlarm(alarmName, callback) {
   chrome.alarms.getAll(function(alarms) {
@@ -326,11 +319,94 @@ function showNextQuestion2() {
 
 function showNextQuestion() {
   console.log('showNextQuestion');
-  if (qnum >= questions.length) {
+  if (qnum >= questions.length && totalQnums != 0) {
     prepQuestions(showNextQuestion2);
+  } else if (qnum == 0 && totalQnums == 0) {
+    errorNotifiction('no_results');
   } else {
     showNextQuestion2();
   }
 }
+
+function openOptions() {
+  if (chrome.runtime.openOptionsPage) {
+    // New way to open options pages, if supported (Chrome 42+).
+    chrome.runtime.openOptionsPage();
+  } else {
+    // Reasonable fallback.
+    window.open(chrome.runtime.getURL('options.html'));
+  }
+}
+
+/* Respond to the user's clicking one of the buttons */
+chrome.notifications.onButtonClicked.addListener(function(notifId, btnIdx) {
+
+  validNotID(notifId, function(validNot) {
+    if (validNot && validNot.stage == 1) {
+      if (btnIdx === 0) {
+        popUpTest2(notifId, validNot.ques, validNot.a1, validNot.a2);
+      } else if (btnIdx === 1) {
+        popUpTest2(notifId, validNot.ques, validNot.a3, validNot.a4);
+      }
+    } else if (validNot && validNot.stage == 2) {
+      chrome.notifications.clear(notifId);
+      if (btnIdx === 0) {
+        checkAnswer(validNot.ques, validNot.ans, validNot.f1);
+        console.log('Check answer final ' + validNot.f1);
+      } else if (btnIdx === 1) {
+        checkAnswer(validNot.ques, validNot.ans, validNot.f2);
+        console.log('Check answer final ' + validNot.f2);
+      }
+    } else if (notifId == error_not) {
+      if (btnIdx === 0) {
+        openOptions();
+      } else if (btnIdx === 1) {
+        checkAlarm('Ruzu', initialSetUp);
+      }
+    } else {
+      console.log('fail if');
+    }
+  });
+
+});
+
+//Add listener for checkAnswer notification so that click to remove is possible
+chrome.notifications.onClicked.addListener(function(notifId) {
+  validNotID(notifId, function(validNot) {
+    if (notifId == error_not) {
+      checkAlarm('Ruzu', initialSetUp);
+    } else if (validNot) {
+      //Do not clear valid questions on click
+    } else {
+      chrome.notifications.clear(notifId);
+    }
+  });
+});
+
+chrome.alarms.onAlarm.addListener(function(alarm) {
+  console.log('Got an alarm!', alarm);
+  if (alarm.name == 'Ruzu') {
+    showNextQuestion();
+  }
+});
+
+chrome.storage.onChanged.addListener(function(changes, namespace) {
+  for (var key in changes) {
+    var storageChange = changes[key];
+    console.log('Storage key ' + key + ' in namespace ' + namespace + ' changed. ' +
+      'Old value was ' + storageChange.oldValue + ', new value is ' + storageChange.newValue + '.');
+    if ((key == 'enabled' || key == 'frequency' || key == 'courseID') && storageChange.oldValue != storageChange.newValue) {
+      console.log('Reset Alarm...');
+      checkAlarm('Ruzu', initialSetUp);
+      break;
+    }
+  }
+});
+
+chrome.extension.onRequest.addListener(function(request) {
+  if (request && (request.id == 'refresh')) {
+    checkAlarm('Ruzu', initialSetUp);
+  }
+});
 
 checkAlarm('Ruzu', initialSetUp);
