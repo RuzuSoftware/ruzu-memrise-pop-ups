@@ -82,7 +82,6 @@ function prepQuestions(callback) {
 }
 
 function popUpTest(question, trueAnswer, answer1, answer2, answer3, answer4) {
-  console.log('popUpTest');
   //Prep notification details
   var options = {
     type: 'basic',
@@ -100,7 +99,7 @@ function popUpTest(question, trueAnswer, answer1, answer2, answer3, answer4) {
 
   //Create notifications and add to array for tracking
   chrome.notifications.create('', options, function(id) {
-    //console.log('Add notification to array: ' + id);
+    //Add notification to array
     not_list.push({
       notID: id,
       ques: question,
@@ -119,7 +118,7 @@ function popUpTest(question, trueAnswer, answer1, answer2, answer3, answer4) {
 
     if (not_list.length > 2 /*TODO CONFIG VAR*/ ) {
       var removeNotID = not_list.shift().notID;
-      //console.log('clear overflow notification ' + removeNotID);
+      //Clear overflow notification
       chrome.notifications.clear(removeNotID);
     }
   });
@@ -165,16 +164,66 @@ function popUpTest2(notifId, question, answer1, answer2) {
 
 }
 
+function sendAnswer() {
+  var data = jQuery.param({
+    box_template: 'multiple_choice',
+    column_a: 1,
+    column_b: 2,
+    course_id: 641893,
+    num_things_seen: 1,
+    points: 150,
+    score: 3106997,
+    thing_id: 59982962,
+    time_paused: 0,
+    time_spent: 10000, //10 secs
+    update_scheduling: true,
+  });
+
+  var xhr = new XMLHttpRequest();
+  xhr.withCredentials = true;
+
+  xhr.onreadystatechange = function() {
+    if (this.readyState === 4) {
+      console.log(this.responseText);
+    }
+  };
+
+  xhr.open('POST', 'http://www.memrise.com/api/garden/register/');
+  xhr.setRequestHeader('accept', 'application/json, text/javascript, */*; q=0.01');
+  //xhr.setRequestHeader('origin', 'http://www.memrise.com');
+  xhr.setRequestHeader('x-requested-with', 'XMLHttpRequest');
+  //xhr.setRequestHeader('user-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36');
+  xhr.setRequestHeader('x-csrftoken', 'Y65wQUDbwdDwGFOYUvUXjdeMZXxvxsphHmqa21reg2if0HXyDlRNPOkeAYtUYt8i'); //Need to generate
+  xhr.setRequestHeader('content-type', 'application/x-www-form-urlencoded');
+  //xhr.setRequestHeader('referer', 'http://www.memrise.com/course/1187237/maeildaneo/garden/review/'); //Course URL
+  //xhr.setRequestHeader('accept-encoding', 'gzip, deflate');
+  //xhr.setRequestHeader('accept-language', 'en-US,en;q=0.8,en-GB;q=0.6');
+  //xhr.setRequestHeader('cookie', 'memprize=true; __cfduid=d009c8f660cffb2d2879311e0d6669f5b1479389644; mp_super_properties=%7B%22all%22%3A%20%7B%22%24initial_referrer%22%3A%20%22http%3A//www.memrise.com/contact/%22%2C%22%24initial_referring_domain%22%3A%20%22www.memrise.com%22%7D%2C%22events%22%3A%20%7B%7D%2C%22funnels%22%3A%20%7B%7D%7D; sessionid=vht5dp3soetdf3qpg1ujz5kdjk7lj24y; _sm_au_c=ijVRQ25qv6ZvJ0Br0c; i18next=en; __utmt=1; csrftoken=lNGuIUzWDjMZIUIX0lfOHICA76KP1RTI4318U1nZn8rI2WRxJbcEdjI2I7GesSCJ; __utma=216705802.150408009.1470053884.1470053884.1479909571.2; __utmb=216705802.2.10.1480338064; __utmc=216705802; __utmz=216705802.1470053884.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); __utma=216705802.150408009.1470053884.1470053884.1479909571.2; __utmb=216705802.3.9.1480338077947; __utmc=216705802; __utmz=216705802.1470053884.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); _sp_id.7bc7=530cd4fbfa08ffbb.1470053885.75.1480338078.1480333872.8ef26705-d565-4724-944a-589cd4191041; _sp_ses.7bc7=*');
+  xhr.setRequestHeader('cache-control', 'no-cache');
+
+  xhr.send(data);
+}
+
 function checkAnswer(ques, correct_ans, answer_in) {
-  console.log('Send ' + answer_in);
 
   var resultCorrect = (answer_in == correct_ans); //API call to get this
   var notmessage, noIconUrl;
 
+  var score; // 1 - correct, 0 = wrong (can only get in between 0 and 1 for typed answers)
+  var points; // 1 point if review not needed, around 50 points for normal review
+
   if (resultCorrect) {
+    score = 1;
+    if (resp.boxes[qnum].review_me) {
+      points = 50; //TODO: Needs revising
+    } else {
+      points = 1;
+    }
     notmessage = 'Correct!';
     noIconUrl = 'images/correct.png';
   } else {
+    score = 0;
+    points = 0;
     notmessage = 'Incorrect, answer is ' + correct_ans;
     noIconUrl = 'images/incorrect.png';
   }
@@ -187,6 +236,22 @@ function checkAnswer(ques, correct_ans, answer_in) {
     iconUrl: noIconUrl,
     isClickable: true
   };
+
+  var answer_data = {
+    box_template: 'multiple_choice',
+    column_a: resp.boxes[qnum].column_a,
+    column_b: resp.boxes[qnum].column_b,
+    course_id: 641893,
+    num_things_seen: qnum,
+    points: points,
+    score: score,
+    thing_id: resp.boxes[qnum].thing_id,
+    time_paused: 0,
+    time_spent: 10000, //10 secs
+    update_scheduling: true,
+  };
+
+  console.log(answer_data);
 
   chrome.notifications.create('', options);
 
@@ -312,13 +377,11 @@ function initialSetUp(enabled, alarmExists) {
 }
 
 function showNextQuestion2() {
-  console.log('showNextQuestion2');
   popUpTest(questions[qnum].question, questions[qnum].answer, questions[qnum].choice1, questions[qnum].choice2, questions[qnum].choice3, questions[qnum].choice4);
   qnum++;
 }
 
 function showNextQuestion() {
-  console.log('showNextQuestion');
   if (qnum >= questions.length && totalQnums != 0) {
     prepQuestions(showNextQuestion2);
   } else if (qnum == 0 && totalQnums == 0) {
@@ -386,7 +449,18 @@ chrome.notifications.onClicked.addListener(function(notifId) {
 chrome.alarms.onAlarm.addListener(function(alarm) {
   console.log('Got an alarm!', alarm);
   if (alarm.name == 'Ruzu') {
-    showNextQuestion();
+    chrome.storage.sync.get({
+      frequency: 5,
+    }, function(settings) {
+      var secs = (settings.frequency * 2) * 60
+      chrome.idle.queryState(secs, function(state) {
+        if (state == 'active') {
+          showNextQuestion();
+        } else {
+          console.log('Question suppressed as PC is ' + state);
+        }
+      });
+    });
   }
 });
 
