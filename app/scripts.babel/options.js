@@ -7,6 +7,7 @@ function save_options() {
   var frequencyVal = document.getElementById('frequency').value;
   var test_amtVal = document.getElementById('test_amt').value;
   var enabledVal = document.getElementById('enabled').checked;
+  var send_answersVal = document.getElementById('send_answers').checked;
   var syncVal = document.getElementById('sync').checked;
   chrome.storage.sync.set({
     courseName: courseNameVal,
@@ -14,6 +15,7 @@ function save_options() {
     frequency: frequencyVal,
     test_amt: test_amtVal,
     enabled: enabledVal,
+    send_answers: send_answersVal,
     sync: syncVal
   }, function() {
     // Update status to let user know options were saved.
@@ -74,6 +76,7 @@ function restore_options() {
     frequency: 5,
     test_amt: 1,
     enabled: true,
+    send_answers: false,
     sync: true
   }, function(items) {
 
@@ -93,6 +96,7 @@ function restore_options() {
       document.getElementById('frequency').value = items.frequency;
       document.getElementById('test_amt').value = items.test_amt;
       document.getElementById('enabled').checked = items.enabled;
+      document.getElementById('send_answers').checked = items.send_answers;
       document.getElementById('sync').checked = items.sync;
     });
   });

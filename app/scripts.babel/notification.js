@@ -5,15 +5,35 @@ var not_list = [];
 var questions = [];
 var qnum = 0;
 var totalQnums = 0;
+var things_seen = 0;
+var sendAnswers = false;
 var error_not;
 var course_id;
 var resp;
+var csrftoken;
+
+function collectCSRF() {
+
+  var xhr = new XMLHttpRequest();
+  console.log('Collect csrf token...');
+  xhr.open('GET', 'http://www.memrise.com/course/' + course_id + '/', true);
+
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState == 4) {
+      var text = xhr.responseText;
+      var regex = /csrftoken: "(.*?)\"/;
+      csrftoken = text.match(regex)[1]; // id = 'Ahg6qcgoay4'
+    }
+  }
+  xhr.send();
+
+}
 
 function prepQuestions(callback) {
   chrome.storage.sync.get({
     courseID: 0
   }, function(settings) {
-    console.log('Got course ID:' + settings.courseID);
+    console.log('Got course ID: ' + settings.courseID);
     course_id = (settings.courseID ? settings.courseID : 0);
     var xhr = new XMLHttpRequest();
     console.log('Connect to course...');
@@ -25,8 +45,10 @@ function prepQuestions(callback) {
     xhr.onreadystatechange = function() {
 
       if (xhr.readyState == 4) {
+
         var jsonOk = false;
         qnum = 0;
+        things_seen = 0;
         totalQnums = 0;
         questions = [];
 
@@ -46,6 +68,8 @@ function prepQuestions(callback) {
         if (jsonOk) {
           totalQnums = resp.boxes.length;
           for (var i = 0; i < totalQnums; i++) {
+
+            //Shuffle answers by putting numbers 1 ~ 4 in an array for use later
             var orderArr = []
             while (orderArr.length < 4) {
               var randomnumber = Math.ceil(Math.random() * 4)
@@ -53,24 +77,41 @@ function prepQuestions(callback) {
               orderArr[orderArr.length] = randomnumber;
             }
 
+            //Collect values from array once
+            var thing_id = resp.boxes[i].thing_id;
+            var column_a = resp.boxes[i].column_a;
+            var column_b = resp.boxes[i].column_b;
+            var choices_length = resp.things[thing_id].columns[column_a].choices.length;
+
+            //Collect idx of 3 random choices
             var valueArr = []
             while (valueArr.length < 3) {
-              var randomnumber = Math.ceil(Math.random() * resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices.length) - 1
+              var randomnumber = Math.ceil(Math.random() * choices_length) - 1
               if (valueArr.indexOf(randomnumber) > -1) continue;
               valueArr[valueArr.length] = randomnumber;
             }
 
+            //Add question to global question list
             questions[i] = {
-              question: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_b].val,
-              answer: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].val,
-              options: resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices
+              course_id: course_id,
+              thing_id: thing_id,
+              column_a: column_a,
+              column_b: column_b,
+              question: resp.things[thing_id].columns[column_b].val,
+              answer: resp.things[thing_id].columns[column_a].val,
+              options: resp.things[thing_id].columns[column_a].choices
             }
-            questions[i]['choice' + orderArr[0]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices[valueArr[0]];
-            questions[i]['choice' + orderArr[1]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices[valueArr[1]];
-            questions[i]['choice' + orderArr[2]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].choices[valueArr[2]];
-            questions[i]['choice' + orderArr[3]] = resp.things[resp.boxes[i].thing_id].columns[resp.boxes[i].column_a].val;
+
+            questions[i]['choice' + orderArr[0]] = resp.things[thing_id].columns[column_a].choices[valueArr[0]];
+            questions[i]['choice' + orderArr[1]] = resp.things[thing_id].columns[column_a].choices[valueArr[1]];
+            questions[i]['choice' + orderArr[2]] = resp.things[thing_id].columns[column_a].choices[valueArr[2]];
+            questions[i]['choice' + orderArr[3]] = resp.things[thing_id].columns[column_a].val;
 
           }
+
+          //Require for write mode
+          collectCSRF();
+
           if (callback) {
             callback(null);
           }
@@ -81,13 +122,21 @@ function prepQuestions(callback) {
   });
 }
 
-function popUpTest(question, trueAnswer, answer1, answer2, answer3, answer4) {
+function popUpTest(qnum_id) {
+
+  var question = questions[qnum_id].question;
+  var trueAnswer = questions[qnum_id].answer;
+  var answer1 = questions[qnum_id].choice1;
+  var answer2 = questions[qnum_id].choice2;
+  var answer3 = questions[qnum_id].choice3;
+  var answer4 = questions[qnum_id].choice4;
+
   //Prep notification details
   var options = {
     type: 'basic',
     title: question,
     message: '',
-    contextMessage: (qnum + 1) + '/' + totalQnums,
+    contextMessage: (qnum_id + 1) + '/' + totalQnums,
     iconUrl: 'images/icon.png',
     buttons: [{
       title: answer1 + ' | ' + answer2,
@@ -102,12 +151,7 @@ function popUpTest(question, trueAnswer, answer1, answer2, answer3, answer4) {
     //Add notification to array
     not_list.push({
       notID: id,
-      ques: question,
-      ans: trueAnswer,
-      a1: answer1,
-      a2: answer2,
-      a3: answer3,
-      a4: answer4,
+      qnum_id: qnum_id,
       stage: 1
     });
 
@@ -135,7 +179,19 @@ function validNotID(notifId, callback) {
   callback(null);
 }
 
-function popUpTest2(notifId, question, answer1, answer2) {
+function popUpTest2(btnIdx, notifId, qnum_id) {
+
+  var question = questions[qnum_id].question;
+  var answer1, answer2;
+
+  if (btnIdx === 0) {
+    var answer1 = questions[qnum_id].choice1;
+    var answer2 = questions[qnum_id].choice2;
+  } else {
+    var answer1 = questions[qnum_id].choice3;
+    var answer2 = questions[qnum_id].choice4;
+  }
+
   var options = {
     type: 'basic',
     title: question,
@@ -164,20 +220,9 @@ function popUpTest2(notifId, question, answer1, answer2) {
 
 }
 
-function sendAnswer() {
-  var data = jQuery.param({
-    box_template: 'multiple_choice',
-    column_a: 1,
-    column_b: 2,
-    course_id: 641893,
-    num_things_seen: 1,
-    points: 150,
-    score: 3106997,
-    thing_id: 59982962,
-    time_paused: 0,
-    time_spent: 10000, //10 secs
-    update_scheduling: true,
-  });
+function sendAnswer(answer_data) {
+
+  var data = jQuery.param(answer_data);
 
   var xhr = new XMLHttpRequest();
   xhr.withCredentials = true;
@@ -190,31 +235,25 @@ function sendAnswer() {
 
   xhr.open('POST', 'http://www.memrise.com/api/garden/register/');
   xhr.setRequestHeader('accept', 'application/json, text/javascript, */*; q=0.01');
-  //xhr.setRequestHeader('origin', 'http://www.memrise.com');
   xhr.setRequestHeader('x-requested-with', 'XMLHttpRequest');
-  //xhr.setRequestHeader('user-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36');
-  xhr.setRequestHeader('x-csrftoken', 'Y65wQUDbwdDwGFOYUvUXjdeMZXxvxsphHmqa21reg2if0HXyDlRNPOkeAYtUYt8i'); //Need to generate
+  xhr.setRequestHeader('x-csrftoken', csrftoken);
   xhr.setRequestHeader('content-type', 'application/x-www-form-urlencoded');
-  //xhr.setRequestHeader('referer', 'http://www.memrise.com/course/1187237/maeildaneo/garden/review/'); //Course URL
-  //xhr.setRequestHeader('accept-encoding', 'gzip, deflate');
-  //xhr.setRequestHeader('accept-language', 'en-US,en;q=0.8,en-GB;q=0.6');
-  //xhr.setRequestHeader('cookie', 'memprize=true; __cfduid=d009c8f660cffb2d2879311e0d6669f5b1479389644; mp_super_properties=%7B%22all%22%3A%20%7B%22%24initial_referrer%22%3A%20%22http%3A//www.memrise.com/contact/%22%2C%22%24initial_referring_domain%22%3A%20%22www.memrise.com%22%7D%2C%22events%22%3A%20%7B%7D%2C%22funnels%22%3A%20%7B%7D%7D; sessionid=vht5dp3soetdf3qpg1ujz5kdjk7lj24y; _sm_au_c=ijVRQ25qv6ZvJ0Br0c; i18next=en; __utmt=1; csrftoken=lNGuIUzWDjMZIUIX0lfOHICA76KP1RTI4318U1nZn8rI2WRxJbcEdjI2I7GesSCJ; __utma=216705802.150408009.1470053884.1470053884.1479909571.2; __utmb=216705802.2.10.1480338064; __utmc=216705802; __utmz=216705802.1470053884.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); __utma=216705802.150408009.1470053884.1470053884.1479909571.2; __utmb=216705802.3.9.1480338077947; __utmc=216705802; __utmz=216705802.1470053884.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); _sp_id.7bc7=530cd4fbfa08ffbb.1470053885.75.1480338078.1480333872.8ef26705-d565-4724-944a-589cd4191041; _sp_ses.7bc7=*');
   xhr.setRequestHeader('cache-control', 'no-cache');
 
   xhr.send(data);
 }
 
-function checkAnswer(ques, correct_ans, answer_in) {
-
-  var resultCorrect = (answer_in == correct_ans); //API call to get this
+function checkAnswer(qnum_id, answer_in) {
+  var ques = questions[qnum_id].question;
+  var correct_ans = questions[qnum_id].answer;
+  var resultCorrect = (answer_in == correct_ans);
   var notmessage, noIconUrl;
-
   var score; // 1 - correct, 0 = wrong (can only get in between 0 and 1 for typed answers)
   var points; // 1 point if review not needed, around 50 points for normal review
 
   if (resultCorrect) {
     score = 1;
-    if (resp.boxes[qnum].review_me) {
+    if (resp.boxes[qnum_id].review_me) {
       points = 50; //TODO: Needs revising
     } else {
       points = 1;
@@ -237,21 +276,31 @@ function checkAnswer(ques, correct_ans, answer_in) {
     isClickable: true
   };
 
+  //Needs to be tracked seperateley since questions can be skipped.
+  things_seen++;
+
+  //Prepare data to send response via API
   var answer_data = {
     box_template: 'multiple_choice',
-    column_a: resp.boxes[qnum].column_a,
-    column_b: resp.boxes[qnum].column_b,
+    column_a: questions[qnum_id].column_a,
+    column_b: questions[qnum_id].column_b,
     course_id: 641893,
-    num_things_seen: qnum,
+    num_things_seen: things_seen,
     points: points,
     score: score,
-    thing_id: resp.boxes[qnum].thing_id,
+    thing_id: questions[qnum_id].thing_id,
     time_paused: 0,
     time_spent: 10000, //10 secs
     update_scheduling: true,
   };
 
-  console.log(answer_data);
+  //Only send responses to memrise.com if settings allow
+  if (sendAnswers) {
+    console.log('Sending response to memrise via API...');
+    sendAnswer(answer_data);
+  } else {
+    console.log('Response not sent to memrise as per settings.');
+  }
 
   chrome.notifications.create('', options);
 
@@ -323,9 +372,10 @@ function checkAlarm(alarmName, callback) {
     });
     chrome.storage.sync.get({
       frequency: 5,
-      enabled: true
+      enabled: true,
+      send_answers: false
     }, function(settings) {
-      callback(settings.enabled, hasAlarm);
+      callback(settings.enabled, hasAlarm, settings.send_answers);
     });
   });
 }
@@ -356,7 +406,8 @@ function createAlarm(alarmName) {
   });
 }
 
-function initialSetUp(enabled, alarmExists) {
+function initialSetUp(enabled, alarmExists, send_answers) {
+  sendAnswers = send_answers;
   if (alarmExists) {
     if (enabled) {
       console.log('Alarm already exists, resetting alarm.');
@@ -377,7 +428,7 @@ function initialSetUp(enabled, alarmExists) {
 }
 
 function showNextQuestion2() {
-  popUpTest(questions[qnum].question, questions[qnum].answer, questions[qnum].choice1, questions[qnum].choice2, questions[qnum].choice3, questions[qnum].choice4);
+  popUpTest(qnum);
   qnum++;
 }
 
@@ -406,19 +457,13 @@ chrome.notifications.onButtonClicked.addListener(function(notifId, btnIdx) {
 
   validNotID(notifId, function(validNot) {
     if (validNot && validNot.stage == 1) {
-      if (btnIdx === 0) {
-        popUpTest2(notifId, validNot.ques, validNot.a1, validNot.a2);
-      } else if (btnIdx === 1) {
-        popUpTest2(notifId, validNot.ques, validNot.a3, validNot.a4);
-      }
+      popUpTest2(btnIdx, notifId, validNot.qnum_id);
     } else if (validNot && validNot.stage == 2) {
       chrome.notifications.clear(notifId);
       if (btnIdx === 0) {
-        checkAnswer(validNot.ques, validNot.ans, validNot.f1);
-        console.log('Check answer final ' + validNot.f1);
+        checkAnswer(validNot.qnum_id, validNot.f1);
       } else if (btnIdx === 1) {
-        checkAnswer(validNot.ques, validNot.ans, validNot.f2);
-        console.log('Check answer final ' + validNot.f2);
+        checkAnswer(validNot.qnum_id, validNot.f2);
       }
     } else if (notifId == error_not) {
       if (btnIdx === 0) {
@@ -427,7 +472,7 @@ chrome.notifications.onButtonClicked.addListener(function(notifId, btnIdx) {
         checkAlarm('Ruzu', initialSetUp);
       }
     } else {
-      console.log('fail if');
+      console.log('Error: Something went wrong when dealing with this notification.');
     }
   });
 
@@ -447,7 +492,7 @@ chrome.notifications.onClicked.addListener(function(notifId) {
 });
 
 chrome.alarms.onAlarm.addListener(function(alarm) {
-  console.log('Got an alarm!', alarm);
+  console.log('Alarm elapsed:', alarm);
   if (alarm.name == 'Ruzu') {
     chrome.storage.sync.get({
       frequency: 5,
@@ -469,7 +514,7 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
     var storageChange = changes[key];
     console.log('Storage key ' + key + ' in namespace ' + namespace + ' changed. ' +
       'Old value was ' + storageChange.oldValue + ', new value is ' + storageChange.newValue + '.');
-    if ((key == 'enabled' || key == 'frequency' || key == 'courseID') && storageChange.oldValue != storageChange.newValue) {
+    if ((key == 'enabled' || key == 'frequency' || key == 'courseID' || key == 'send_answers') && storageChange.oldValue != storageChange.newValue) {
       console.log('Reset Alarm...');
       checkAlarm('Ruzu', initialSetUp);
       break;
