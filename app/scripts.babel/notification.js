@@ -10,6 +10,7 @@ var sendAnswers = false;
 var error_not;
 var course_id;
 var resp;
+var everthing_ok = true;
 var csrftoken;
 
 function collectCSRF() {
@@ -66,6 +67,7 @@ function prepQuestions(callback) {
           }
         }
         if (jsonOk) {
+          setIconStatus('On');
           totalQnums = resp.boxes.length;
           for (var i = 0; i < totalQnums; i++) {
 
@@ -306,7 +308,43 @@ function checkAnswer(qnum_id, answer_in) {
 
 }
 
+function setIconStatus(status) {
+
+  var badgeBackgroundColor, badgeText;
+
+  switch (status) {
+    case 'On':
+      everthing_ok = true;
+      badgeBackgroundColor = '#5cb85c';
+      badgeText = 'On';
+      break;
+    case 'Error':
+      everthing_ok = false;
+      badgeBackgroundColor = '#ff033e';
+      badgeText = status;
+      break;
+    case 'Off':
+      everthing_ok = true;
+      badgeBackgroundColor = '#1e90ff';
+      badgeText = status;
+      break;
+    default:
+      badgeText = '';
+  }
+
+  if (badgeBackgroundColor) {
+    chrome.browserAction.setBadgeBackgroundColor({
+      color: badgeBackgroundColor
+    });
+  }
+  chrome.browserAction.setBadgeText({
+    text: badgeText
+  });
+
+}
+
 function errorNotifiction(error_type) {
+  setIconStatus('Error');
   var iconUrl = 'images/error_temp.png';
   switch (error_type) {
     case 'invalid_course_id':
@@ -381,6 +419,7 @@ function checkAlarm(alarmName, callback) {
 }
 
 function cancelAlarm(alarmName) {
+  setIconStatus('Off');
   chrome.alarms.clear(alarmName);
 }
 
@@ -390,6 +429,7 @@ function createAlarm(alarmName) {
     enabled: true
   }, function(settings) {
     if (settings.enabled) {
+      setIconStatus('On');
       var alarmOptions = {
         delayInMinutes: Number(settings.frequency),
         periodInMinutes: Number(settings.frequency)
@@ -400,6 +440,7 @@ function createAlarm(alarmName) {
         chrome.alarms.create(alarmName, alarmOptions);
       });
     } else {
+      setIconStatus('Off');
       cancelAlarm('Ruzu');
       console.log('Alarm cancelled / not created due to enabled flag being false.');
     }
@@ -422,6 +463,7 @@ function initialSetUp(enabled, alarmExists, send_answers) {
       console.log('Alarm does not exist, creating alarm...');
       createAlarm('Ruzu');
     } else {
+      setIconStatus('Off');
       console.log('Ruzu Memrise pop-ups disabled, no need to create alarm.');
     }
   }
