@@ -139,7 +139,7 @@ function popUpTest(qnum_id) {
     title: question,
     message: '',
     contextMessage: (qnum_id + 1) + '/' + totalQnums,
-    iconUrl: 'images/icon.png',
+    iconUrl: 'images/icon48.png',
     buttons: [{
       title: answer1 + ' | ' + answer2,
     }, {
@@ -198,7 +198,7 @@ function popUpTest2(btnIdx, notifId, qnum_id) {
     type: 'basic',
     title: question,
     message: 'Choose the correct answer.',
-    iconUrl: 'images/icon.png',
+    iconUrl: 'images/icon48.png',
     buttons: [{
       title: answer1,
     }, {
@@ -367,7 +367,7 @@ function errorNotifiction(error_type) {
         title: 'Attention!',
         message: 'No questions to review.',
         contextMessage: 'Select other course or wait until later.',
-        iconUrl: 'images/icon.png',
+        iconUrl: 'images/icon48.png',
         isClickable: true,
         requireInteraction: true,
         buttons: [{
