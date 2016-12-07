@@ -26,11 +26,12 @@
     "notifications",
     "alarms",
     "idle",
+    "background",
     "http://www.memrise.com/*"
   ],
   "options_ui": {
     "page": "options.html",
-    "chrome_style": true
+    "chrome_style": false
   },
   "web_accessible_resources": [
     "images/icon48.png"

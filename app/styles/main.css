@@ -2,3 +2,6 @@ body {
   padding: 10px;
   min-width: 500px;
 }
+#showNextQuestion {
+  float: right;
+}

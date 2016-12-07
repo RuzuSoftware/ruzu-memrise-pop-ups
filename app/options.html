@@ -3,7 +3,7 @@
 
 <head>
   <title>Ruzu Memrise pop-ups settings</title>
-  <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+  <link href="https://bootswatch.com/paper/bootstrap.min.css" rel="stylesheet">
   <!-- build:css styles/options-vendor.css -->
   <!-- bower:css -->
   <!-- endbower -->
@@ -15,6 +15,7 @@
 
 <body>
   <div class="form-group">
+    <legend>Settings</legend>
     <div id="course_wrap">
       <label for="course">Course</label>
       <select class="form-control" id="course"></select>
@@ -74,9 +75,10 @@
     </label>
   </div>
 
-  <div id="status"></div>
+  <div id="status" style="opacity: 0;">.</div>
   <br/>
-  <button id="save" class="btn btn-default">Save</button>
+  <button id="save" class="btn btn-success">Save</button>
+  <button id="showNextQuestion" class="btn btn-primary" disabled="true">Show next question</button>
   <!-- build:js scripts/options-vendor.js -->
   <!-- bower:js -->
   <script src="bower_components/jquery/dist/jquery.js"></script>

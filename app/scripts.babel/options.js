@@ -18,12 +18,9 @@ function save_options() {
     send_answers: send_answersVal,
     sync: syncVal
   }, function() {
-    // Update status to let user know options were saved.
-    var status = document.getElementById('status');
-    status.textContent = 'Options saved.';
-    setTimeout(function() {
-      status.textContent = '';
-    }, 750);
+    // Show message to let user know options were saved.
+    showMessage('Options saved.');
+    restore_options();
   });
 }
 
@@ -88,10 +85,17 @@ function restore_options() {
         );
         $('#course_wrap').hide();
         $('#course_error').show();
+
       } else {
         $('#course_wrap').show();
         $('#course_error').hide();
+        if (items.enabled && items.courseID != 0) {
+          $('#showNextQuestion').prop('disabled', false);
+        } else {
+          $('#showNextQuestion').prop('disabled', true);
+        }
       }
+
       document.getElementById('course').value = items.courseID;
       document.getElementById('frequency').value = items.frequency;
       document.getElementById('test_amt').value = items.test_amt;
@@ -103,6 +107,21 @@ function restore_options() {
 
 }
 
+function showMessage(msg) {
+  $('#status').text(msg);
+  $('#status').fadeTo('slow', 1);
+  setTimeout(function() {
+    $('#status').fadeTo('slow', 0);
+  }, 3000);
+}
+
+function showNextQuestion() {
+  chrome.runtime.sendMessage({
+    id: 'showNextQuestion'
+  });
+}
+
 document.addEventListener('DOMContentLoaded', restore_options);
 document.getElementById('save').addEventListener('click', save_options);
 document.getElementById('tryAgain').addEventListener('click', restore_options);
+document.getElementById('showNextQuestion').addEventListener('click', showNextQuestion);

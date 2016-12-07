@@ -1,6 +1,7 @@
 'use strict';
 
-// Copyright (c) 2016 Ruzu. All rights reserved.
+// Copyright (c) 2016 Ruzu Studios. All rights reserved.
+
 var not_list = [];
 var questions = [];
 var qnum = 0;
@@ -23,7 +24,7 @@ function collectCSRF() {
     if (xhr.readyState == 4) {
       var text = xhr.responseText;
       var regex = /csrftoken: "(.*?)\"/;
-      csrftoken = text.match(regex)[1]; // id = 'Ahg6qcgoay4'
+      csrftoken = text.match(regex)[1];
     }
   }
   xhr.send();
@@ -475,13 +476,22 @@ function showNextQuestion2() {
 }
 
 function showNextQuestion() {
-  if (qnum >= questions.length && totalQnums != 0) {
-    prepQuestions(showNextQuestion2);
-  } else if (qnum == 0 && totalQnums == 0) {
-    errorNotifiction('no_results');
-  } else {
-    showNextQuestion2();
-  }
+
+  chrome.storage.sync.get({
+    enabled: true,
+  }, function(settings) {
+    if (settings.enabled) {
+      if (qnum >= questions.length && totalQnums != 0) {
+        prepQuestions(showNextQuestion2);
+      } else if (qnum == 0 && totalQnums == 0) {
+        errorNotifiction('no_results');
+      } else {
+        showNextQuestion2();
+      }
+    } else {
+      console.log('Cannot show next question when app disabled. Please enable in options page.');
+    }
+  });
 }
 
 function openOptions() {
@@ -564,9 +574,11 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
   }
 });
 
-chrome.extension.onRequest.addListener(function(request) {
+chrome.runtime.onMessage.addListener(function(request) {
   if (request && (request.id == 'refresh')) {
     checkAlarm('Ruzu', initialSetUp);
+  } else if (request && (request.id == 'showNextQuestion')) {
+    showNextQuestion();
   }
 });
 
