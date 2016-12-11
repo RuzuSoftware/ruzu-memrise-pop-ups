@@ -33,7 +33,7 @@ function collectCSRF() {
 
 function prepQuestions(callback) {
   chrome.storage.sync.get({
-    courseID: 0
+    courseID: defaultCourseID
   }, function(settings) {
     console.log('Got course ID: ' + settings.courseID);
     course_id = (settings.courseID ? settings.courseID : 0);
@@ -410,9 +410,9 @@ function checkAlarm(alarmName, callback) {
       return a.name == alarmName;
     });
     chrome.storage.sync.get({
-      frequency: 5,
-      enabled: true,
-      send_answers: false
+      frequency: defaultFrequency,
+      enabled: defaultEnabled,
+      send_answers: defaultSend_answers
     }, function(settings) {
       callback(settings.enabled, hasAlarm, settings.send_answers);
     });
@@ -426,8 +426,8 @@ function cancelAlarm(alarmName) {
 
 function createAlarm(alarmName) {
   chrome.storage.sync.get({
-    frequency: 5,
-    enabled: true
+    frequency: defaultFrequency,
+    enabled: defaultEnabled
   }, function(settings) {
     if (settings.enabled) {
       setIconStatus('On');
@@ -442,7 +442,7 @@ function createAlarm(alarmName) {
       });
     } else {
       setIconStatus('Off');
-      cancelAlarm('Ruzu');
+      cancelAlarm(alarmName);
       console.log('Alarm cancelled / not created due to enabled flag being false.');
     }
   });
@@ -453,16 +453,16 @@ function initialSetUp(enabled, alarmExists, send_answers) {
   if (alarmExists) {
     if (enabled) {
       console.log('Alarm already exists, resetting alarm.');
-      cancelAlarm('Ruzu');
-      createAlarm('Ruzu');
+      cancelAlarm(alarmName);
+      createAlarm(alarmName);
     } else {
       console.log('Ruzu Memrise pop-ups disabled, disabling alarm.');
-      cancelAlarm('Ruzu');
+      cancelAlarm(alarmName);
     }
   } else {
     if (enabled) {
       console.log('Alarm does not exist, creating alarm...');
-      createAlarm('Ruzu');
+      createAlarm(alarmName);
     } else {
       setIconStatus('Off');
       console.log('Ruzu Memrise pop-ups disabled, no need to create alarm.');
@@ -478,7 +478,7 @@ function showNextQuestion2() {
 function showNextQuestion() {
 
   chrome.storage.sync.get({
-    enabled: true,
+    enabled: defaultEnabled,
   }, function(settings) {
     if (settings.enabled) {
       if (qnum >= questions.length && totalQnums != 0) {
@@ -521,7 +521,7 @@ chrome.notifications.onButtonClicked.addListener(function(notifId, btnIdx) {
       if (btnIdx === 0) {
         openOptions();
       } else if (btnIdx === 1) {
-        checkAlarm('Ruzu', initialSetUp);
+        checkAlarm(alarmName, initialSetUp);
       }
     } else {
       console.log('Error: Something went wrong when dealing with this notification.');
@@ -534,7 +534,7 @@ chrome.notifications.onButtonClicked.addListener(function(notifId, btnIdx) {
 chrome.notifications.onClicked.addListener(function(notifId) {
   validNotID(notifId, function(validNot) {
     if (notifId == error_not) {
-      checkAlarm('Ruzu', initialSetUp);
+      checkAlarm(alarmName, initialSetUp);
     } else if (validNot) {
       //Do not clear valid questions on click
     } else {
@@ -545,9 +545,9 @@ chrome.notifications.onClicked.addListener(function(notifId) {
 
 chrome.alarms.onAlarm.addListener(function(alarm) {
   console.log('Alarm elapsed:', alarm);
-  if (alarm.name == 'Ruzu') {
+  if (alarm.name == alarmName) {
     chrome.storage.sync.get({
-      frequency: 5,
+      frequency: defaultFrequency,
     }, function(settings) {
       var secs = (settings.frequency * 2) * 60
       chrome.idle.queryState(secs, function(state) {
@@ -568,7 +568,7 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
       'Old value was ' + storageChange.oldValue + ', new value is ' + storageChange.newValue + '.');
     if ((key == 'enabled' || key == 'frequency' || key == 'courseID' || key == 'send_answers') && storageChange.oldValue != storageChange.newValue) {
       console.log('Reset Alarm...');
-      checkAlarm('Ruzu', initialSetUp);
+      checkAlarm(alarmName, initialSetUp);
       break;
     }
   }
@@ -576,10 +576,10 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
 
 chrome.runtime.onMessage.addListener(function(request) {
   if (request && (request.id == 'refresh')) {
-    checkAlarm('Ruzu', initialSetUp);
+    checkAlarm(alarmName, initialSetUp);
   } else if (request && (request.id == 'showNextQuestion')) {
     showNextQuestion();
   }
 });
 
-checkAlarm('Ruzu', initialSetUp);
+checkAlarm(alarmName, initialSetUp);

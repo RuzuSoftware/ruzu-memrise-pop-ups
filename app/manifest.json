@@ -16,7 +16,10 @@
   "background": {
     "scripts": [
       "scripts/chromereload.js",
+      "scripts/config.js",
       "scripts/notification.js",
+      "scripts/iconMenu.js",
+      "scripts/install_update.js",
       "bower_components/jquery/dist/jquery.min.js"
     ],
     "persistent": true
@@ -27,6 +30,7 @@
     "alarms",
     "idle",
     "background",
+    "contextMenus",
     "http://www.memrise.com/*"
   ],
   "options_ui": {

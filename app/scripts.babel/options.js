@@ -69,12 +69,12 @@ function restore_options() {
   // Use default values if not set
   chrome.storage.sync.get({
     courseName: '(Please select a course)',
-    courseID: 0,
-    frequency: 5,
-    test_amt: 1,
-    enabled: true,
-    send_answers: false,
-    sync: true
+    courseID: defaultCourseID,
+    frequency: defaultFrequency,
+    test_amt: defaultTest_amt,
+    enabled: defaultEnabled,
+    send_answers: defaultSend_answers,
+    sync: defaultSync
   }, function(items) {
 
     getCourses(function(success) {
