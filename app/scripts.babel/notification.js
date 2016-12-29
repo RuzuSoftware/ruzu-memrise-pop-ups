@@ -13,11 +13,14 @@ var course_id;
 var resp;
 var everthing_ok = true;
 var csrftoken;
+var idleCount = 0;
+var sessionOpen = false;
 
 function collectCSRF() {
 
   var xhr = new XMLHttpRequest();
   console.log('Collect csrf token...');
+  sessionOpen = true;
   xhr.open('GET', 'http://www.memrise.com/course/' + course_id + '/', true);
 
   xhr.onreadystatechange = function() {
@@ -81,9 +84,11 @@ function prepQuestions(callback) {
             }
 
             //Collect values from array once
+            var question;
             var thing_id = resp.boxes[i].thing_id;
             var column_a = resp.boxes[i].column_a;
             var column_b = resp.boxes[i].column_b;
+            var questionType = resp.things[thing_id].columns[column_b].kind;
             var choices_length = resp.things[thing_id].columns[column_a].choices.length;
 
             //Collect idx of 3 random choices
@@ -94,15 +99,22 @@ function prepQuestions(callback) {
               valueArr[valueArr.length] = randomnumber;
             }
 
+            if (questionType == 'text') {
+              question = resp.things[thing_id].columns[column_b].val;
+            } else if (questionType == 'image') {
+              question = 'http://static.memrise.com/' + resp.things[thing_id].columns[column_b].val[0].url;
+            }
+
             //Add question to global question list
             questions[i] = {
               course_id: course_id,
               thing_id: thing_id,
               column_a: column_a,
               column_b: column_b,
-              question: resp.things[thing_id].columns[column_b].val,
+              question: question,
               answer: resp.things[thing_id].columns[column_a].val,
-              options: resp.things[thing_id].columns[column_a].choices
+              options: resp.things[thing_id].columns[column_a].choices,
+              questionType: questionType
             }
 
             questions[i]['choice' + orderArr[0]] = resp.things[thing_id].columns[column_a].choices[valueArr[0]];
@@ -134,20 +146,35 @@ function popUpTest(qnum_id) {
   var answer3 = questions[qnum_id].choice3;
   var answer4 = questions[qnum_id].choice4;
 
+  var optionsType;
+  var optionsTitle;
+
+  if (questions[qnum_id].questionType == 'text') {
+    optionsType = 'basic';
+    optionsTitle = question;
+  } else if (questions[qnum_id].questionType == 'image') {
+    optionsType = 'image';
+    optionsTitle = 'Image';
+  }
+
   //Prep notification details
   var options = {
-    type: 'basic',
-    title: question,
+    type: optionsType,
+    title: optionsTitle,
     message: '',
     contextMessage: (qnum_id + 1) + '/' + totalQnums,
     iconUrl: 'images/icon48.png',
     buttons: [{
-      title: answer1 + ' | ' + answer2,
+      title: answer1 + ' ' + spacer + ' ' + answer2,
     }, {
-      title: answer3 + ' | ' + answer4,
+      title: answer3 + ' ' + spacer + ' ' + answer4,
     }],
     requireInteraction: true
   };
+
+  if (questions[qnum_id].questionType == 'image') {
+    options.imageUrl = question;
+  }
 
   //Create notifications and add to array for tracking
   chrome.notifications.create('', options, function(id) {
@@ -196,10 +223,7 @@ function popUpTest2(btnIdx, notifId, qnum_id) {
   }
 
   var options = {
-    type: 'basic',
-    title: question,
     message: 'Choose the correct answer.',
-    iconUrl: 'images/icon48.png',
     buttons: [{
       title: answer1,
     }, {
@@ -254,6 +278,19 @@ function checkAnswer(qnum_id, answer_in) {
   var score; // 1 - correct, 0 = wrong (can only get in between 0 and 1 for typed answers)
   var points; // 1 point if review not needed, around 50 points for normal review
 
+  var questionType = questions[qnum_id].questionType;
+  var optionsType;
+  var optionsTitle;
+
+  if (questionType == 'text') {
+    optionsType = 'basic';
+    optionsTitle = ques;
+  } else if (questionType == 'image') {
+    optionsType = 'image';
+    optionsTitle = 'Image';
+  }
+
+
   if (resultCorrect) {
     score = 1;
     if (resp.boxes[qnum_id].review_me) {
@@ -271,13 +308,17 @@ function checkAnswer(qnum_id, answer_in) {
   }
 
   var options = {
-    type: 'basic',
-    title: ques,
+    type: optionsType,
+    title: optionsTitle,
     message: notmessage,
     contextMessage: 'You chose ' + answer_in,
     iconUrl: noIconUrl,
     isClickable: true
   };
+
+  if (questionType == 'image') {
+    options.imageUrl = ques;
+  }
 
   //Needs to be tracked seperateley since questions can be skipped.
   things_seen++;
@@ -404,7 +445,18 @@ function errorNotifiction(error_type) {
 
 }
 
+function clearNotifications() {
+  //Clear existing notifications
+  for (var i = 0; i < not_list.length; i++) {
+    chrome.notifications.clear(not_list[i].notID);
+  }
+}
+
 function checkAlarm(alarmName, callback) {
+
+  //Clear existing notifications
+  clearNotifications();
+
   chrome.alarms.getAll(function(alarms) {
     var hasAlarm = alarms.some(function(a) {
       return a.name == alarmName;
@@ -504,6 +556,17 @@ function openOptions() {
   }
 }
 
+function closeSession() {
+  /*
+   * Close session and reset values so that data needs
+   * to be pulled on next question pop-up. This helps
+   * prevent stale questions being kept in memory
+   */
+  sessionOpen = false;
+  qnum = totalQnums;
+  clearNotifications();
+}
+
 /* Respond to the user's clicking one of the buttons */
 chrome.notifications.onButtonClicked.addListener(function(notifId, btnIdx) {
 
@@ -543,6 +606,20 @@ chrome.notifications.onClicked.addListener(function(notifId) {
   });
 });
 
+chrome.commands.onCommand.addListener(function(command) {
+  if (command == 'ruzu-toggle-enabled') {
+    chrome.storage.sync.get({
+      enabled: defaultEnabled
+    }, function(items) {
+      chrome.storage.sync.set({
+        enabled: !items.enabled
+      });
+    });
+  } else if (command == 'ruzu-show-next-question') {
+    showNextQuestion();
+  }
+});
+
 chrome.alarms.onAlarm.addListener(function(alarm) {
   console.log('Alarm elapsed:', alarm);
   if (alarm.name == alarmName) {
@@ -552,9 +629,15 @@ chrome.alarms.onAlarm.addListener(function(alarm) {
       var secs = (settings.frequency * 2) * 60
       chrome.idle.queryState(secs, function(state) {
         if (state == 'active') {
+          idleCount = 0;
           showNextQuestion();
         } else {
           console.log('Question suppressed as PC is ' + state);
+          idleCount++;
+          if (idleCount > 3 && sessionOpen) {
+            console.log('Closing session after long period of inactivity...');
+            closeSession();
+          }
         }
       });
     });

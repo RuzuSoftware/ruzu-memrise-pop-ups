@@ -1,6 +1,7 @@
 'use strict';
 
 var alarmName = 'Ruzu';
+var spacer = '•'; //'♦';
 
 // Options settings defauls
 var defaultCourseID = 0;
