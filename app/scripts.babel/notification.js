@@ -16,6 +16,21 @@ var csrftoken;
 var idleCount = 0;
 var sessionOpen = false;
 
+/*
+ * Check if a notification is a valid Ruzu Memrise pop-up question
+ * Then pass the not_list value to the callback
+ * Note that this does not consider error notifications as valid
+ */
+function validNotID(notifId, callback) {
+  for (var i = 0; i < not_list.length; i++) {
+    if (not_list[i].notID == notifId) {
+      callback(not_list[i]);
+      return;
+    }
+  }
+  callback(null);
+}
+
 function collectCSRF() {
 
   var xhr = new XMLHttpRequest();
@@ -137,6 +152,9 @@ function prepQuestions(callback) {
   });
 }
 
+/*
+ * Generate the initial question pop-up for a given qnum_id
+ */
 function popUpTest(qnum_id) {
 
   var question = questions[qnum_id].question;
@@ -199,19 +217,12 @@ function popUpTest(qnum_id) {
 
 }
 
-function validNotID(notifId, callback) {
-  for (var i = 0; i < not_list.length; i++) {
-    if (not_list[i].notID == notifId) {
-      callback(not_list[i]);
-      return;
-    }
-  }
-  callback(null);
-}
-
+/*
+ * Update a notification with stage 2 options depending
+ * on the button clicked.
+ */
 function popUpTest2(btnIdx, notifId, qnum_id) {
 
-  var question = questions[qnum_id].question;
   var answer1, answer2;
 
   if (btnIdx === 0) {
@@ -247,6 +258,40 @@ function popUpTest2(btnIdx, notifId, qnum_id) {
 
 }
 
+/*
+ * Revert a buttion at stage 2 to stage 1 to
+ * show all 4 options again as it did initially
+ */
+function revertQuestion(notifId, qnum_id) {
+
+  var answer1 = questions[qnum_id].choice1;
+  var answer2 = questions[qnum_id].choice2;
+  var answer3 = questions[qnum_id].choice3;
+  var answer4 = questions[qnum_id].choice4;
+
+  var options = {
+    message: '',
+    buttons: [{
+      title: answer1 + ' ' + spacer + ' ' + answer2,
+    }, {
+      title: answer3 + ' ' + spacer + ' ' + answer4,
+    }]
+  };
+
+  chrome.notifications.update(notifId, options);
+
+  //Mark notification as stage 1
+  not_list.map(function(not) {
+    if (not.notID == notifId) {
+      not.stage = 1;
+    }
+  });
+
+}
+
+/*
+ * Send the selected answer to memrise
+ */
 function sendAnswer(answer_data) {
 
   var data = jQuery.param(answer_data);
@@ -270,6 +315,11 @@ function sendAnswer(answer_data) {
   xhr.send(data);
 }
 
+/*
+ * Check calculate whether the selected answer
+ * was correct or not and respond with a new notification accordingly.
+ * This function also calls sendAnswer() if sendAnswers = true.
+ */
 function checkAnswer(qnum_id, answer_in) {
   var ques = questions[qnum_id].question;
   var correct_ans = questions[qnum_id].answer;
@@ -349,6 +399,7 @@ function checkAnswer(qnum_id, answer_in) {
   chrome.notifications.create('', options);
 
 }
+
 
 function setIconStatus(status) {
 
@@ -445,16 +496,21 @@ function errorNotifiction(error_type) {
 
 }
 
+/*
+ * Clear current on-screen notifications
+ */
 function clearNotifications() {
-  //Clear existing notifications
   for (var i = 0; i < not_list.length; i++) {
     chrome.notifications.clear(not_list[i].notID);
   }
 }
 
+/*
+ * Derive whether Alarm is set + user settings
+ * to callback for alarm refresh / initial set up [initialSetUp()]
+ */
 function checkAlarm(alarmName, callback) {
 
-  //Clear existing notifications
   clearNotifications();
 
   chrome.alarms.getAll(function(alarms) {
@@ -469,6 +525,7 @@ function checkAlarm(alarmName, callback) {
       callback(settings.enabled, hasAlarm, settings.send_answers);
     });
   });
+
 }
 
 function cancelAlarm(alarmName) {
@@ -476,6 +533,9 @@ function cancelAlarm(alarmName) {
   chrome.alarms.clear(alarmName);
 }
 
+/*
+ * Create alarm, only when settings are enabled
+ */
 function createAlarm(alarmName) {
   chrome.storage.sync.get({
     frequency: defaultFrequency,
@@ -500,6 +560,10 @@ function createAlarm(alarmName) {
   });
 }
 
+/*
+ * Used for initial setup of alarm
+ * and refresh of alarm when settings have changed
+ */
 function initialSetUp(enabled, alarmExists, send_answers) {
   sendAnswers = send_answers;
   if (alarmExists) {
@@ -522,13 +586,11 @@ function initialSetUp(enabled, alarmExists, send_answers) {
   }
 }
 
-function showNextQuestion2() {
-  popUpTest(qnum);
-  qnum++;
-}
-
+/*
+ * Show next pop-up, suppress questions when settings are disabled and
+ * pull more questions if all local questions have been displayed already
+ */
 function showNextQuestion() {
-
   chrome.storage.sync.get({
     enabled: defaultEnabled,
   }, function(settings) {
@@ -546,6 +608,14 @@ function showNextQuestion() {
   });
 }
 
+/*
+ * Display next question from local cache
+ */
+function showNextQuestion2() {
+  popUpTest(qnum);
+  qnum++;
+}
+
 function openOptions() {
   if (chrome.runtime.openOptionsPage) {
     // New way to open options pages, if supported (Chrome 42+).
@@ -556,20 +626,21 @@ function openOptions() {
   }
 }
 
+/*
+ * Close session and reset values so that data needs to be pulled on next
+ * question pop-up. This helps prevent stale questions being kept in memory
+ */
 function closeSession() {
-  /*
-   * Close session and reset values so that data needs
-   * to be pulled on next question pop-up. This helps
-   * prevent stale questions being kept in memory
-   */
   sessionOpen = false;
   qnum = totalQnums;
+  //TODO - Call end session API endpoint
   clearNotifications();
 }
 
-/* Respond to the user's clicking one of the buttons */
+/*
+ * Respond to the user's clicking one of the buttons
+ */
 chrome.notifications.onButtonClicked.addListener(function(notifId, btnIdx) {
-
   validNotID(notifId, function(validNot) {
     if (validNot && validNot.stage == 1) {
       popUpTest2(btnIdx, notifId, validNot.qnum_id);
@@ -590,22 +661,30 @@ chrome.notifications.onButtonClicked.addListener(function(notifId, btnIdx) {
       console.log('Error: Something went wrong when dealing with this notification.');
     }
   });
-
 });
 
-//Add listener for checkAnswer notification so that click to remove is possible
+/*
+ * onClicked listener, handles error notification removal
+ * and stage 2 revertQuestion function
+ */
 chrome.notifications.onClicked.addListener(function(notifId) {
   validNotID(notifId, function(validNot) {
     if (notifId == error_not) {
       checkAlarm(alarmName, initialSetUp);
-    } else if (validNot) {
+    } else if (validNot && validNot.stage != 2) {
       //Do not clear valid questions on click
+    } else if (validNot && validNot.stage == 2) {
+      //Revert stage 2 questions
+      revertQuestion(notifId, validNot.qnum_id);
     } else {
       chrome.notifications.clear(notifId);
     }
   });
 });
 
+/*
+ * Command listener for keyboard shortcuts
+ */
 chrome.commands.onCommand.addListener(function(command) {
   if (command == 'ruzu-toggle-enabled') {
     chrome.storage.sync.get({
@@ -657,6 +736,9 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
   }
 });
 
+/*
+ * Handle messages from options page etc
+ */
 chrome.runtime.onMessage.addListener(function(request) {
   if (request && (request.id == 'refresh')) {
     checkAlarm(alarmName, initialSetUp);
