@@ -203,11 +203,6 @@ function popUpTest(qnum_id) {
       stage: 1
     });
 
-    //console.log('notifications(' + not_list.length + ')');
-    // for (var i = 0; i < not_list.length; i++) {
-    //   console.log(not_list[i].notID);
-    // }
-
     if (not_list.length > 2 /*TODO CONFIG VAR*/ ) {
       var removeNotID = not_list.shift().notID;
       //Clear overflow notification
@@ -250,11 +245,8 @@ function popUpTest2(btnIdx, notifId, qnum_id) {
       not_list[i].f2 = answer2;
     }
   }
-  // console.log('notifications: ' + not_list);
+
   chrome.notifications.update(notifId, options);
-  // for (var i = 0; i < not_list.length; i++) {
-  //   console.log(not_list[i].notID);
-  // }
 
 }
 
@@ -300,7 +292,7 @@ function sendAnswer(answer_data) {
   xhr.withCredentials = true;
 
   xhr.onreadystatechange = function() {
-    if (this.readyState === 4) {
+    if (this.readyState == 4) {
       console.log(this.responseText);
     }
   };
@@ -378,7 +370,7 @@ function checkAnswer(qnum_id, answer_in) {
     box_template: 'multiple_choice',
     column_a: questions[qnum_id].column_a,
     column_b: questions[qnum_id].column_b,
-    course_id: 641893,
+    course_id: questions[qnum_id].course_id,
     num_things_seen: things_seen,
     points: points,
     score: score,
@@ -658,7 +650,7 @@ chrome.notifications.onButtonClicked.addListener(function(notifId, btnIdx) {
         checkAlarm(alarmName, initialSetUp);
       }
     } else {
-      console.log('Error: Something went wrong when dealing with this notification.');
+      console.error('Error: Something went wrong when dealing with this notification.');
     }
   });
 });
@@ -726,8 +718,8 @@ chrome.alarms.onAlarm.addListener(function(alarm) {
 chrome.storage.onChanged.addListener(function(changes, namespace) {
   for (var key in changes) {
     var storageChange = changes[key];
-    console.log('Storage key ' + key + ' in namespace ' + namespace + ' changed. ' +
-      'Old value was ' + storageChange.oldValue + ', new value is ' + storageChange.newValue + '.');
+    // console.log('Storage key ' + key + ' in namespace ' + namespace + ' changed. ' +
+    //   'Old value was ' + storageChange.oldValue + ', new value is ' + storageChange.newValue + '.');
     if ((key == 'enabled' || key == 'frequency' || key == 'courseID' || key == 'send_answers') && storageChange.oldValue != storageChange.newValue) {
       console.log('Reset Alarm...');
       checkAlarm(alarmName, initialSetUp);
