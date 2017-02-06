@@ -47,7 +47,7 @@ function getCourses(callback) {
         courseSelect.empty();
         for (var i = 0; i < resp.courses.length; i++) {
           courseSelect.append(
-            $('<option></option>').val(resp.courses[i].id).html(resp.courses[i].name)
+            $('<option></option>').val(resp.courses[i].id).html(resp.courses[i].name+' ('+((resp.courses[i].review) ? resp.courses[i].review : 0)+')')
           );
         }
         if (callback) {
