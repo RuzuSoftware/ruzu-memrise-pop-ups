@@ -36,7 +36,7 @@ function collectCSRF() {
   var xhr = new XMLHttpRequest();
   console.log('Collect csrf token...');
   sessionOpen = true;
-  xhr.open('GET', 'http://www.memrise.com/course/' + course_id + '/', true);
+  xhr.open('GET', 'https://www.memrise.com/course/' + course_id + '/', true);
 
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
@@ -60,7 +60,7 @@ function prepQuestions(callback) {
     if (error_not) {
       chrome.notifications.clear(error_not);
     }
-    xhr.open('GET', 'http://www.memrise.com/ajax/session/?course_id=' + course_id + '&session_slug=review_course', true);
+    xhr.open('GET', 'https://www.memrise.com/ajax/session/?course_id=' + course_id + '&session_slug=review_course', true);
 
     xhr.onreadystatechange = function() {
 
@@ -117,7 +117,7 @@ function prepQuestions(callback) {
             if (questionType == 'text') {
               question = resp.things[thing_id].columns[column_b].val;
             } else if (questionType == 'image') {
-              question = 'http://static.memrise.com/' + resp.things[thing_id].columns[column_b].val[0].url;
+              question = 'https://static.memrise.com/' + resp.things[thing_id].columns[column_b].val[0].url;
             }
 
             //Add question to global question list
@@ -140,7 +140,7 @@ function prepQuestions(callback) {
           }
 
           //Require for write mode
-          collectCSRF();
+          //collectCSRF();
 
           if (callback) {
             callback(null);
@@ -297,7 +297,7 @@ function sendAnswer(answer_data) {
     }
   };
 
-  xhr.open('POST', 'http://www.memrise.com/api/garden/register/');
+  xhr.open('POST', 'https://www.memrise.com/api/garden/register/');
   xhr.setRequestHeader('accept', 'application/json, text/javascript, */*; q=0.01');
   xhr.setRequestHeader('x-requested-with', 'XMLHttpRequest');
   xhr.setRequestHeader('x-csrftoken', csrftoken);
@@ -381,12 +381,12 @@ function checkAnswer(qnum_id, answer_in) {
   };
 
   //Only send responses to memrise.com if settings allow
-  if (sendAnswers) {
-    console.log('Sending response to memrise via API...');
-    sendAnswer(answer_data);
-  } else {
-    console.log('Response not sent to memrise as per settings.');
-  }
+  // if (sendAnswers) {
+  //   console.log('Sending response to memrise via API...');
+  //   sendAnswer(answer_data);
+  // } else {
+  //   console.log('Response not sent to memrise as per settings.');
+  // }
 
   chrome.notifications.create('', options);
 
