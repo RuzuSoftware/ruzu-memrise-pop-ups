@@ -117,7 +117,7 @@ function prepQuestions(callback) {
             if (questionType == 'text') {
               question = resp.things[thing_id].columns[column_b].val;
             } else if (questionType == 'image') {
-              question = 'https://static.memrise.com/' + resp.things[thing_id].columns[column_b].val[0].url;
+              question = 'http://static.memrise.com/' + resp.things[thing_id].columns[column_b].val[0].url;
             }
 
             //Add question to global question list
