@@ -6,8 +6,6 @@ var not_list = [];
 var questions = [];
 var qnum = 0;
 var totalQnums = 0;
-var things_seen = 0;
-var sendAnswers = false;
 var error_not;
 var course_id;
 var resp;
@@ -15,7 +13,7 @@ var everthing_ok = true;
 var csrftoken;
 var idleCount = 0;
 var sessionOpen = false;
-
+var xhr = [];
 /*
  * Check if a notification is a valid Ruzu Memrise pop-up question
  * Then pass the not_list value to the callback
@@ -31,124 +29,146 @@ function validNotID(notifId, callback) {
   callback(null);
 }
 
-function collectCSRF() {
-
+function getNumLevels(course_id, callback) {
+  var jsonOk = false;
   var xhr = new XMLHttpRequest();
-  console.log('Collect csrf token...');
-  sessionOpen = true;
-  xhr.open('GET', 'https://www.memrise.com/course/' + course_id + '/', true);
-
+  var num_levels = 1;
+  xhr.open('GET', 'https://www.memrise.com/ajax/session/?course_id=' + course_id + '&level_index=1&session_slug=preview', true);
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
-      var text = xhr.responseText;
-      var regex = /csrftoken: "(.*?)\"/;
-      csrftoken = text.match(regex)[1];
+      // JSON.parse does not evaluate the attacker's scripts.
+      try {
+        resp = JSON.parse(xhr.responseText);
+        jsonOk = true;
+      } catch (e) {
+        console.log('Error connecting to memrise.');
+        console.log(e);
+        if (course_id == '0') {
+          errorNotifiction('invalid_course_id');
+        } else {
+          errorNotifiction(null);
+        }
+      }
+      if (jsonOk) {
+        setIconStatus('On');
+        num_levels = resp.session.course.num_levels;
+        var idx;
+        if (callback) {
+          callback(num_levels);
+        }
+      }
     }
   }
   xhr.send();
-
 }
 
 function prepQuestions(callback) {
   chrome.storage.sync.get({
     courseID: defaultCourseID
   }, function(settings) {
-    console.log('Got course ID: ' + settings.courseID);
     course_id = (settings.courseID ? settings.courseID : 0);
-    var xhr = new XMLHttpRequest();
-    console.log('Connect to course...');
+    var jsonOk = false;
+    var thisLevelQnums = 0;
+    qnum = 0;
+    totalQnums = 0;
+    questions = [];
+    console.log('Connecting to course...');
     if (error_not) {
       chrome.notifications.clear(error_not);
     }
-    xhr.open('GET', 'https://www.memrise.com/ajax/session/?course_id=' + course_id + '&session_slug=review_course', true);
 
-    xhr.onreadystatechange = function() {
+    getNumLevels(course_id, function(num_levels) {
+      for (var this_level = 1; this_level <= num_levels; this_level++) {
+        (function(this_level) {
+          console.log('Loading level ' + this_level + '...');
+          xhr[this_level] = new XMLHttpRequest();
+          xhr[this_level].open('GET', 'https://www.memrise.com/ajax/session/?course_id=' + course_id + '&level_index=' + this_level + '&session_slug=preview', true);
 
-      if (xhr.readyState == 4) {
+          xhr[this_level].onreadystatechange = function() {
 
-        var jsonOk = false;
-        qnum = 0;
-        things_seen = 0;
-        totalQnums = 0;
-        questions = [];
+            if (xhr[this_level].readyState == 4) {
 
-        // JSON.parse does not evaluate the attacker's scripts.
-        try {
-          resp = JSON.parse(xhr.responseText);
-          jsonOk = true;
-        } catch (e) {
-          console.log('Error connecting to memrise.');
-          console.log(e);
-          if (course_id == '0') {
-            errorNotifiction('invalid_course_id');
-          } else {
-            errorNotifiction(null);
+              jsonOk = false;
+
+              // JSON.parse does not evaluate the attacker's scripts.
+              try {
+                if (xhr[this_level].responseText) {
+                  resp = JSON.parse(xhr[this_level].responseText);
+                  jsonOk = true;
+                } else {
+                  console.log('Level '+this_level+' returned no results...');
+              }
+              } catch (e) {
+                console.log('Error connecting to memrise.');
+                console.log(e);
+                if (course_id == '0') {
+                  errorNotifiction('invalid_course_id');
+                } else {
+                  errorNotifiction(null);
+                }
+              }
+              if (jsonOk) {
+                setIconStatus('On');
+                totalQnums += resp.learnables.length;
+                thisLevelQnums = resp.learnables.length;
+                var idx;
+                for (var i = 0; i < thisLevelQnums; i++) {
+                  //Shuffle answers by putting numbers 1 ~ 4 in an array for use later
+                  var orderArr = []
+                  while (orderArr.length < 4) {
+                    var randomnumber = Math.ceil(Math.random() * 4)
+                    if (orderArr.indexOf(randomnumber) > -1) continue;
+                    orderArr[orderArr.length] = randomnumber;
+                  }
+
+                  //Collect values from array once
+                  var question;
+                  var thing_id = resp.learnables[i].thing_id;
+                  if (resp.learnables[i].tests.multiple_choice.prompt.hasOwnProperty('text')) {
+                    var question = resp.learnables[i].tests.multiple_choice.prompt.text;
+                    var questionType = 'text';
+                  } else {
+                    var question = resp.learnables[i].tests.multiple_choice.prompt.image[0];
+                    var questionType = 'image';
+                  }
+                  var answer = resp.learnables[i].tests.multiple_choice.correct;
+                  var choices_length = resp.learnables[i].tests.multiple_choice.choices.length;
+
+                  //Collect idx of 3 random choices
+                  var valueArr = []
+                  while (valueArr.length < 3) {
+                    var randomnumber = Math.ceil(Math.random() * choices_length) - 1
+                    if (valueArr.indexOf(randomnumber) > -1) continue;
+                    valueArr[valueArr.length] = randomnumber;
+                  }
+
+                  //Add question to global question list
+                  idx = questions.length;
+                  questions[idx] = {
+                    course_id: course_id,
+                    thing_id: thing_id,
+                    question: question,
+                    answer: resp.learnables[i].tests.multiple_choice.correct,
+                    options: resp.learnables[i].tests.multiple_choice.choices,
+                    questionType: questionType
+                  }
+                  questions[idx]['choice' + orderArr[0]] = resp.learnables[i].tests.multiple_choice.choices[valueArr[0]];
+                  questions[idx]['choice' + orderArr[1]] = resp.learnables[i].tests.multiple_choice.choices[valueArr[1]];
+                  questions[idx]['choice' + orderArr[2]] = resp.learnables[i].tests.multiple_choice.choices[valueArr[2]];
+                  questions[idx]['choice' + orderArr[3]] = resp.learnables[i].tests.multiple_choice.correct;
+
+                }
+
+                if (callback && this_level <= num_levels) {
+                  callback(null);
+                }
+              }
+            }
           }
-        }
-        if (jsonOk) {
-          setIconStatus('On');
-          totalQnums = resp.boxes.length;
-          for (var i = 0; i < totalQnums; i++) {
-
-            //Shuffle answers by putting numbers 1 ~ 4 in an array for use later
-            var orderArr = []
-            while (orderArr.length < 4) {
-              var randomnumber = Math.ceil(Math.random() * 4)
-              if (orderArr.indexOf(randomnumber) > -1) continue;
-              orderArr[orderArr.length] = randomnumber;
-            }
-
-            //Collect values from array once
-            var question;
-            var thing_id = resp.boxes[i].thing_id;
-            var column_a = resp.boxes[i].column_a;
-            var column_b = resp.boxes[i].column_b;
-            var questionType = resp.things[thing_id].columns[column_b].kind;
-            var choices_length = resp.things[thing_id].columns[column_a].choices.length;
-
-            //Collect idx of 3 random choices
-            var valueArr = []
-            while (valueArr.length < 3) {
-              var randomnumber = Math.ceil(Math.random() * choices_length) - 1
-              if (valueArr.indexOf(randomnumber) > -1) continue;
-              valueArr[valueArr.length] = randomnumber;
-            }
-
-            if (questionType == 'text') {
-              question = resp.things[thing_id].columns[column_b].val;
-            } else if (questionType == 'image') {
-              question = 'http://static.memrise.com/' + resp.things[thing_id].columns[column_b].val[0].url;
-            }
-
-            //Add question to global question list
-            questions[i] = {
-              course_id: course_id,
-              thing_id: thing_id,
-              column_a: column_a,
-              column_b: column_b,
-              question: question,
-              answer: resp.things[thing_id].columns[column_a].val,
-              options: resp.things[thing_id].columns[column_a].choices,
-              questionType: questionType
-            }
-
-            questions[i]['choice' + orderArr[0]] = resp.things[thing_id].columns[column_a].choices[valueArr[0]];
-            questions[i]['choice' + orderArr[1]] = resp.things[thing_id].columns[column_a].choices[valueArr[1]];
-            questions[i]['choice' + orderArr[2]] = resp.things[thing_id].columns[column_a].choices[valueArr[2]];
-            questions[i]['choice' + orderArr[3]] = resp.things[thing_id].columns[column_a].val;
-
-          }
-
-          //Require for write mode
-          //collectCSRF();
-
-          if (callback) {
-            callback(null);
-          }
-        }
+          xhr[this_level].send();
+        })(this_level);
       }
-    }
-    xhr.send();
+    });
   });
 }
 
@@ -281,36 +301,10 @@ function revertQuestion(notifId, qnum_id) {
 
 }
 
-/*
- * Send the selected answer to memrise
- */
-function sendAnswer(answer_data) {
-
-  var data = jQuery.param(answer_data);
-
-  var xhr = new XMLHttpRequest();
-  xhr.withCredentials = true;
-
-  xhr.onreadystatechange = function() {
-    if (this.readyState == 4) {
-      console.log(this.responseText);
-    }
-  };
-
-  xhr.open('POST', 'https://www.memrise.com/api/garden/register/');
-  xhr.setRequestHeader('accept', 'application/json, text/javascript, */*; q=0.01');
-  xhr.setRequestHeader('x-requested-with', 'XMLHttpRequest');
-  xhr.setRequestHeader('x-csrftoken', csrftoken);
-  xhr.setRequestHeader('content-type', 'application/x-www-form-urlencoded');
-  xhr.setRequestHeader('cache-control', 'no-cache');
-
-  xhr.send(data);
-}
 
 /*
  * Check calculate whether the selected answer
  * was correct or not and respond with a new notification accordingly.
- * This function also calls sendAnswer() if sendAnswers = true.
  */
 function checkAnswer(qnum_id, answer_in) {
   var ques = questions[qnum_id].question;
@@ -335,7 +329,7 @@ function checkAnswer(qnum_id, answer_in) {
 
   if (resultCorrect) {
     score = 1;
-    if (resp.boxes[qnum_id].review_me) {
+    if (resp.learnables[qnum_id].review_me) {
       points = 50; //TODO: Needs revising
     } else {
       points = 1;
@@ -361,32 +355,6 @@ function checkAnswer(qnum_id, answer_in) {
   if (questionType == 'image') {
     options.imageUrl = ques;
   }
-
-  //Needs to be tracked seperateley since questions can be skipped.
-  things_seen++;
-
-  //Prepare data to send response via API
-  var answer_data = {
-    box_template: 'multiple_choice',
-    column_a: questions[qnum_id].column_a,
-    column_b: questions[qnum_id].column_b,
-    course_id: questions[qnum_id].course_id,
-    num_things_seen: things_seen,
-    points: points,
-    score: score,
-    thing_id: questions[qnum_id].thing_id,
-    time_paused: 0,
-    time_spent: 10000, //10 secs
-    update_scheduling: true,
-  };
-
-  //Only send responses to memrise.com if settings allow
-  // if (sendAnswers) {
-  //   console.log('Sending response to memrise via API...');
-  //   sendAnswer(answer_data);
-  // } else {
-  //   console.log('Response not sent to memrise as per settings.');
-  // }
 
   chrome.notifications.create('', options);
 
@@ -512,9 +480,8 @@ function checkAlarm(alarmName, callback) {
     chrome.storage.sync.get({
       frequency: defaultFrequency,
       enabled: defaultEnabled,
-      send_answers: defaultSend_answers
     }, function(settings) {
-      callback(settings.enabled, hasAlarm, settings.send_answers);
+      callback(settings.enabled, hasAlarm);
     });
   });
 
@@ -556,8 +523,7 @@ function createAlarm(alarmName) {
  * Used for initial setup of alarm
  * and refresh of alarm when settings have changed
  */
-function initialSetUp(enabled, alarmExists, send_answers) {
-  sendAnswers = send_answers;
+function initialSetUp(enabled, alarmExists) {
   if (alarmExists) {
     if (enabled) {
       console.log('Alarm already exists, resetting alarm.');
@@ -720,7 +686,7 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
     var storageChange = changes[key];
     // console.log('Storage key ' + key + ' in namespace ' + namespace + ' changed. ' +
     //   'Old value was ' + storageChange.oldValue + ', new value is ' + storageChange.newValue + '.');
-    if ((key == 'enabled' || key == 'frequency' || key == 'courseID' || key == 'send_answers') && storageChange.oldValue != storageChange.newValue) {
+    if ((key == 'enabled' || key == 'frequency' || key == 'courseID') && storageChange.oldValue != storageChange.newValue) {
       console.log('Reset Alarm...');
       checkAlarm(alarmName, initialSetUp);
       break;
