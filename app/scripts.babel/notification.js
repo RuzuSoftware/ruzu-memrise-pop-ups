@@ -96,8 +96,8 @@ function prepQuestions(callback) {
                   resp = JSON.parse(xhr[this_level].responseText);
                   jsonOk = true;
                 } else {
-                  console.log('Level '+this_level+' returned no results...');
-              }
+                  console.log('Level ' + this_level + ' returned no results...');
+                }
               } catch (e) {
                 console.log('Error connecting to memrise.');
                 console.log(e);
@@ -311,8 +311,6 @@ function checkAnswer(qnum_id, answer_in) {
   var correct_ans = questions[qnum_id].answer;
   var resultCorrect = (answer_in == correct_ans);
   var notmessage, noIconUrl;
-  var score; // 1 - correct, 0 = wrong (can only get in between 0 and 1 for typed answers)
-  var points; // 1 point if review not needed, around 50 points for normal review
 
   var questionType = questions[qnum_id].questionType;
   var optionsType;
@@ -328,17 +326,9 @@ function checkAnswer(qnum_id, answer_in) {
 
 
   if (resultCorrect) {
-    score = 1;
-    if (resp.learnables[qnum_id].review_me) {
-      points = 50; //TODO: Needs revising
-    } else {
-      points = 1;
-    }
     notmessage = 'Correct!';
     noIconUrl = 'images/correct.png';
   } else {
-    score = 0;
-    points = 0;
     notmessage = 'Incorrect, answer is ' + correct_ans;
     noIconUrl = 'images/incorrect.png';
   }
@@ -567,11 +557,28 @@ function showNextQuestion() {
 }
 
 /*
+ * getRandomIntInclusive - The maximum is inclusive and the minimum is inclusive
+ */
+function getRandomIntInclusive(min, max) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/*
  * Display next question from local cache
  */
 function showNextQuestion2() {
-  popUpTest(qnum);
-  qnum++;
+  chrome.storage.sync.get({
+    randomOrder: defaultRandomOrder,
+  }, function(settings) {
+    if (settings.randomOrder) {
+      popUpTest(getRandomIntInclusive(0, totalQnums-1));
+    } else {
+      popUpTest(qnum);
+      qnum++;
+    }
+  });
 }
 
 function openOptions() {
@@ -686,7 +693,10 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
     var storageChange = changes[key];
     // console.log('Storage key ' + key + ' in namespace ' + namespace + ' changed. ' +
     //   'Old value was ' + storageChange.oldValue + ', new value is ' + storageChange.newValue + '.');
-    if ((key == 'enabled' || key == 'frequency' || key == 'courseID') && storageChange.oldValue != storageChange.newValue) {
+    if ((key == 'enabled' ||
+        key == 'frequency' ||
+        key == 'courseID' ||
+        key == 'randomOrder') && storageChange.oldValue != storageChange.newValue) {
       console.log('Reset Alarm...');
       checkAlarm(alarmName, initialSetUp);
       break;

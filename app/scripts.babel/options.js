@@ -5,14 +5,14 @@ function save_options() {
   var courseNameVal = $('#course option:selected').text();
   var courseIDVal = document.getElementById('course').value;
   var frequencyVal = document.getElementById('frequency').value;
-  var test_amtVal = document.getElementById('test_amt').value;
+  var randomOrderVal = document.getElementById('random_order').checked;
   var enabledVal = document.getElementById('enabled').checked;
   var syncVal = document.getElementById('sync').checked;
   chrome.storage.sync.set({
     courseName: courseNameVal,
     courseID: courseIDVal,
     frequency: frequencyVal,
-    test_amt: test_amtVal,
+    randomOrder: randomOrderVal,
     enabled: enabledVal,
     sync: syncVal
   }, function() {
@@ -69,7 +69,7 @@ function restore_options() {
     courseName: '(Please select a course)',
     courseID: defaultCourseID,
     frequency: defaultFrequency,
-    test_amt: defaultTest_amt,
+    randomOrder: defaultRandomOrder,
     enabled: defaultEnabled,
     sync: defaultSync
   }, function(items) {
@@ -95,7 +95,7 @@ function restore_options() {
 
       document.getElementById('course').value = items.courseID;
       document.getElementById('frequency').value = items.frequency;
-      document.getElementById('test_amt').value = items.test_amt;
+      document.getElementById('random_order').checked = items.randomOrder;
       document.getElementById('enabled').checked = items.enabled;
       document.getElementById('sync').checked = items.sync;
     });
