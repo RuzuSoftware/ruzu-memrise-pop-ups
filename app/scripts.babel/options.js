@@ -5,13 +5,17 @@ function save_options() {
   var courseNameVal = $('#course option:selected').text();
   var courseIDVal = document.getElementById('course').value;
   var frequencyVal = document.getElementById('frequency').value;
+  var reviewTypeVal = document.getElementById('review_type').value;
+  var dueVal = document.getElementById('due').checked;
   var randomOrderVal = document.getElementById('random_order').checked;
   var enabledVal = document.getElementById('enabled').checked;
   var syncVal = document.getElementById('sync').checked;
   chrome.storage.sync.set({
     courseName: courseNameVal,
     courseID: courseIDVal,
+    reviewType: reviewTypeVal,
     frequency: frequencyVal,
+    due: dueVal,
     randomOrder: randomOrderVal,
     enabled: enabledVal,
     sync: syncVal
@@ -45,7 +49,7 @@ function getCourses(callback) {
         courseSelect.empty();
         for (var i = 0; i < resp.courses.length; i++) {
           courseSelect.append(
-            $('<option></option>').val(resp.courses[i].id).html(resp.courses[i].name + ' (' + ((resp.courses[i].num_things) ? resp.courses[i].num_things : 0) + ')')
+            $('<option></option>').val(resp.courses[i].id).html(resp.courses[i].name + ' (' + ((resp.courses[i].review) ? resp.courses[i].review : 0)+'/'+((resp.courses[i].num_things) ? resp.courses[i].num_things : 0) + ')')
           );
         }
         if (callback) {
@@ -68,7 +72,9 @@ function restore_options() {
   chrome.storage.sync.get({
     courseName: '(Please select a course)',
     courseID: defaultCourseID,
+    reviewType: defaultreviewType,
     frequency: defaultFrequency,
+    due: defaultDue,
     randomOrder: defaultRandomOrder,
     enabled: defaultEnabled,
     sync: defaultSync
@@ -95,6 +101,8 @@ function restore_options() {
 
       document.getElementById('course').value = items.courseID;
       document.getElementById('frequency').value = items.frequency;
+      document.getElementById('review_type').value = items.reviewType;
+      document.getElementById('due').checked = items.due;
       document.getElementById('random_order').checked = items.randomOrder;
       document.getElementById('enabled').checked = items.enabled;
       document.getElementById('sync').checked = items.sync;

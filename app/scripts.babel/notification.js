@@ -8,7 +8,6 @@ var qnum = 0;
 var totalQnums = 0;
 var error_not;
 var course_id;
-var resp;
 var everthing_ok = true;
 var csrftoken;
 var idleCount = 0;
@@ -33,6 +32,7 @@ function getNumLevels(course_id, callback) {
   var jsonOk = false;
   var xhr = new XMLHttpRequest();
   var num_levels = 1;
+  var resp;
   xhr.open('GET', 'https://www.memrise.com/ajax/session/?course_id=' + course_id + '&level_index=1&session_slug=preview', true);
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
@@ -64,11 +64,16 @@ function getNumLevels(course_id, callback) {
 
 function prepQuestions(callback) {
   chrome.storage.sync.get({
-    courseID: defaultCourseID
+    courseID: defaultCourseID,
+    reviewType: defaultreviewType,
+    due: defaultDue,
   }, function(settings) {
     course_id = (settings.courseID ? settings.courseID : 0);
     var jsonOk = false;
     var thisLevelQnums = 0;
+    var resp;
+    var valid_question;
+    var date_now = new Date(Date.now());
     qnum = 0;
     totalQnums = 0;
     questions = [];
@@ -109,7 +114,6 @@ function prepQuestions(callback) {
               }
               if (jsonOk) {
                 setIconStatus('On');
-                totalQnums += resp.learnables.length;
                 thisLevelQnums = resp.learnables.length;
                 var idx;
                 for (var i = 0; i < thisLevelQnums; i++) {
@@ -123,7 +127,6 @@ function prepQuestions(callback) {
 
                   //Collect values from array once
                   var question;
-                  var thing_id = resp.learnables[i].thing_id;
                   if (resp.learnables[i].tests.multiple_choice.prompt.hasOwnProperty('text')) {
                     var question = resp.learnables[i].tests.multiple_choice.prompt.text;
                     var questionType = 'text';
@@ -142,23 +145,59 @@ function prepQuestions(callback) {
                     valueArr[valueArr.length] = randomnumber;
                   }
 
-                  //Add question to global question list
-                  idx = questions.length;
-                  questions[idx] = {
-                    course_id: course_id,
-                    thing_id: thing_id,
-                    question: question,
-                    answer: resp.learnables[i].tests.multiple_choice.correct,
-                    options: resp.learnables[i].tests.multiple_choice.choices,
-                    questionType: questionType
+                  valid_question = false;
+                  var is_difficult = (resp.thingusers[i] ? resp.thingusers[i].is_difficult : false);
+                  var ignored = (resp.thingusers[i] ? resp.thingusers[i].ignored : false);
+                  var next_date = (resp.thingusers[i] ? resp.thingusers[i].next_date : Date.now());
+                  var growth_level = (resp.thingusers[i] ? resp.thingusers[i].growth_level : 0);
+                  var starred = (resp.thingusers[i] ? resp.thingusers[i].starred : false);
+
+                  // Filter based on Review Type
+                  if (settings.reviewType == 'ALL') {
+                    valid_question = true;
+                  } else if (settings.reviewType == 'DIFFICULT' && is_difficult) {
+                    valid_question = true;
+                  } else if (settings.reviewType == 'STARRED' && starred) {
+                    valid_question = true;
                   }
-                  questions[idx]['choice' + orderArr[0]] = resp.learnables[i].tests.multiple_choice.choices[valueArr[0]];
-                  questions[idx]['choice' + orderArr[1]] = resp.learnables[i].tests.multiple_choice.choices[valueArr[1]];
-                  questions[idx]['choice' + orderArr[2]] = resp.learnables[i].tests.multiple_choice.choices[valueArr[2]];
-                  questions[idx]['choice' + orderArr[3]] = resp.learnables[i].tests.multiple_choice.correct;
 
+                  //Filter out due questions
+                  if (settings.due && valid_question) {
+                    if (new Date(next_date) <= date_now && growth_level >= 6) {
+                      valid_question = true;
+                    } else {
+                      valid_question = false;
+                    }
+                  }
+
+                  //Filter out ignored questions - (TODO: Include ignored words option)
+                  if (ignored) {
+                    valid_question = false;
+                  }
+
+                  if (valid_question) {
+                    totalQnums += 1;
+                    //Add question to global question list
+                    idx = questions.length;
+                    questions[idx] = {
+                      course_id: course_id,
+                      thing_id: resp.learnables[i].thing_id,
+                      question: question,
+                      answer: resp.learnables[i].tests.multiple_choice.correct,
+                      options: resp.learnables[i].tests.multiple_choice.choices,
+                      questionType: questionType,
+                      is_difficult: is_difficult,
+                      ignored: ignored,
+                      next_date: next_date,
+                      growth_level: growth_level,
+                      starred: starred
+                    }
+                    questions[idx]['choice' + orderArr[0]] = resp.learnables[i].tests.multiple_choice.choices[valueArr[0]];
+                    questions[idx]['choice' + orderArr[1]] = resp.learnables[i].tests.multiple_choice.choices[valueArr[1]];
+                    questions[idx]['choice' + orderArr[2]] = resp.learnables[i].tests.multiple_choice.choices[valueArr[2]];
+                    questions[idx]['choice' + orderArr[3]] = resp.learnables[i].tests.multiple_choice.correct;
+                  }
                 }
-
                 if (callback && this_level <= num_levels) {
                   callback(null);
                 }
@@ -573,7 +612,7 @@ function showNextQuestion2() {
     randomOrder: defaultRandomOrder,
   }, function(settings) {
     if (settings.randomOrder) {
-      popUpTest(getRandomIntInclusive(0, totalQnums-1));
+      popUpTest(getRandomIntInclusive(0, totalQnums - 1));
     } else {
       popUpTest(qnum);
       qnum++;
@@ -691,12 +730,12 @@ chrome.alarms.onAlarm.addListener(function(alarm) {
 chrome.storage.onChanged.addListener(function(changes, namespace) {
   for (var key in changes) {
     var storageChange = changes[key];
-    // console.log('Storage key ' + key + ' in namespace ' + namespace + ' changed. ' +
-    //   'Old value was ' + storageChange.oldValue + ', new value is ' + storageChange.newValue + '.');
     if ((key == 'enabled' ||
         key == 'frequency' ||
         key == 'courseID' ||
-        key == 'randomOrder') && storageChange.oldValue != storageChange.newValue) {
+        key == 'randomOrder' ||
+        key == 'reviewType' ||
+        key == 'due') && storageChange.oldValue != storageChange.newValue) {
       console.log('Reset Alarm...');
       checkAlarm(alarmName, initialSetUp);
       break;
