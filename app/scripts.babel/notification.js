@@ -127,15 +127,16 @@ function prepQuestions(callback) {
 
                   //Collect values from array once
                   var question;
-                  if (resp.learnables[i].tests.multiple_choice.prompt.hasOwnProperty('text')) {
-                    var question = resp.learnables[i].tests.multiple_choice.prompt.text;
+                  var learnable_id = resp.learnables[i].learnable_id;
+                  if (resp.screens[learnable_id].multiple_choice.prompt.hasOwnProperty('text')) {
+                    var question = resp.screens[learnable_id].multiple_choice.prompt.text;
                     var questionType = 'text';
                   } else {
-                    var question = resp.learnables[i].tests.multiple_choice.prompt.image[0];
+                    var question = resp.screens[learnable_id].multiple_choice.prompt.image[0];
                     var questionType = 'image';
                   }
-                  var answer = resp.learnables[i].tests.multiple_choice.correct;
-                  var choices_length = resp.learnables[i].tests.multiple_choice.choices.length;
+                  var answer = resp.screens[learnable_id].multiple_choice.correct;
+                  var choices_length = resp.screens[learnable_id].multiple_choice.choices.length;
 
                   //Collect idx of 3 random choices
                   var valueArr = []
@@ -183,8 +184,8 @@ function prepQuestions(callback) {
                       course_id: course_id,
                       thing_id: resp.learnables[i].thing_id,
                       question: question,
-                      answer: resp.learnables[i].tests.multiple_choice.correct,
-                      options: resp.learnables[i].tests.multiple_choice.choices,
+                      answer: resp.screens[learnable_id].multiple_choice.correct,
+                      options: resp.screens[learnable_id].multiple_choice.choices,
                       questionType: questionType,
                       is_difficult: is_difficult,
                       ignored: ignored,
@@ -192,10 +193,10 @@ function prepQuestions(callback) {
                       growth_level: growth_level,
                       starred: starred
                     }
-                    questions[idx]['choice' + orderArr[0]] = resp.learnables[i].tests.multiple_choice.choices[valueArr[0]];
-                    questions[idx]['choice' + orderArr[1]] = resp.learnables[i].tests.multiple_choice.choices[valueArr[1]];
-                    questions[idx]['choice' + orderArr[2]] = resp.learnables[i].tests.multiple_choice.choices[valueArr[2]];
-                    questions[idx]['choice' + orderArr[3]] = resp.learnables[i].tests.multiple_choice.correct;
+                    questions[idx]['choice' + orderArr[0]] = resp.screens[learnable_id].multiple_choice.choices[valueArr[0]];
+                    questions[idx]['choice' + orderArr[1]] = resp.screens[learnable_id].multiple_choice.choices[valueArr[1]];
+                    questions[idx]['choice' + orderArr[2]] = resp.screens[learnable_id].multiple_choice.choices[valueArr[2]];
+                    questions[idx]['choice' + orderArr[3]] = resp.screens[learnable_id].multiple_choice.correct;
                   }
                 }
                 if (callback && this_level <= num_levels) {

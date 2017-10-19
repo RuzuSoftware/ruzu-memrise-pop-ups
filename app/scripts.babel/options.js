@@ -2,6 +2,7 @@
 
 // Saves options to chrome.storage.sync.
 function save_options() {
+  $('#showNextQuestion').prop('disabled', true);
   var courseNameVal = $('#course option:selected').text();
   var courseIDVal = document.getElementById('course').value;
   var frequencyVal = document.getElementById('frequency').value;
@@ -49,7 +50,7 @@ function getCourses(callback) {
         courseSelect.empty();
         for (var i = 0; i < resp.courses.length; i++) {
           courseSelect.append(
-            $('<option></option>').val(resp.courses[i].id).html(resp.courses[i].name + ' (' + ((resp.courses[i].review) ? resp.courses[i].review : 0)+'/'+((resp.courses[i].num_things) ? resp.courses[i].num_things : 0) + ')')
+            $('<option></option>').val(resp.courses[i].id).html(resp.courses[i].name + ' (' + ((resp.courses[i].review) ? resp.courses[i].review : 0) + '/' + ((resp.courses[i].num_things) ? resp.courses[i].num_things : 0) + ')')
           );
         }
         if (callback) {
@@ -93,7 +94,9 @@ function restore_options() {
         $('#course_wrap').show();
         $('#course_error').hide();
         if (items.enabled && items.courseID != 0) {
-          $('#showNextQuestion').prop('disabled', false);
+          setTimeout(function() {
+            $('#showNextQuestion').prop('disabled', false);
+          }, 1500);
         } else {
           $('#showNextQuestion').prop('disabled', true);
         }
