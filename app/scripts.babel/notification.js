@@ -8,11 +8,12 @@ var qnum = 0;
 var totalQnums = 0;
 var error_not;
 var course_id;
-var everthing_ok = true;
+var everything_ok = true;
 var csrftoken;
 var idleCount = 0;
 var sessionOpen = false;
 var xhr = [];
+
 /*
  * Check if a notification is a valid Ruzu Memrise pop-up question
  * Then pass the not_list value to the callback
@@ -33,7 +34,7 @@ function getNumLevels(course_id, callback) {
   var xhr = new XMLHttpRequest();
   var num_levels = 1;
   var resp;
-  xhr.open('GET', 'https://www.memrise.com/ajax/session/?course_id=' + course_id + '&level_index=1&session_slug=preview', true);
+  xhr.open('GET', urlRoot + '/ajax/session/?course_id=' + course_id + '&level_index=1&session_slug=preview', true);
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
       // JSON.parse does not evaluate the attacker's scripts.
@@ -87,7 +88,7 @@ function prepQuestions(callback) {
         (function(this_level) {
           console.log('Loading level ' + this_level + '...');
           xhr[this_level] = new XMLHttpRequest();
-          xhr[this_level].open('GET', 'https://www.memrise.com/ajax/session/?course_id=' + course_id + '&level_index=' + this_level + '&session_slug=preview', true);
+          xhr[this_level].open('GET', urlRoot + '/ajax/session/?course_id=' + course_id + '&level_index=' + this_level + '&session_slug=preview', true);
 
           xhr[this_level].onreadystatechange = function() {
 
@@ -128,15 +129,15 @@ function prepQuestions(callback) {
                   //Collect values from array once
                   var question;
                   var learnable_id = resp.learnables[i].learnable_id;
-                  if (resp.screens[learnable_id].multiple_choice.prompt.hasOwnProperty('text') && resp.screens[learnable_id].multiple_choice.prompt.text != null) {
-                    var question = resp.screens[learnable_id].multiple_choice.prompt.text.value;
+                  if (resp.screens[learnable_id][2].prompt.hasOwnProperty('text') && resp.screens[learnable_id][2].prompt.text != null) {
+                    var question = resp.screens[learnable_id][2].prompt.text.value;
                     var questionType = 'text';
                   } else {
-                    var question = resp.screens[learnable_id].multiple_choice.prompt.image.value[0];
+                    var question = resp.screens[learnable_id][2].prompt.image.value[0];
                     var questionType = 'image';
                   }
-                  var answer = resp.screens[learnable_id].multiple_choice.correct[0];
-                  var choices_length = resp.screens[learnable_id].multiple_choice.choices.length;
+                  var answer = resp.screens[learnable_id][2].correct[0];
+                  var choices_length = resp.screens[learnable_id][2].choices.length;
 
                   //Collect idx of 3 random choices
                   var valueArr = []
@@ -184,8 +185,8 @@ function prepQuestions(callback) {
                       course_id: course_id,
                       thing_id: resp.learnables[i].thing_id,
                       question: question,
-                      answer: resp.screens[learnable_id].multiple_choice.correct[0],
-                      options: resp.screens[learnable_id].multiple_choice.choices,
+                      answer: resp.screens[learnable_id][2].correct[0],
+                      options: resp.screens[learnable_id][2].choices,
                       questionType: questionType,
                       is_difficult: is_difficult,
                       ignored: ignored,
@@ -193,10 +194,10 @@ function prepQuestions(callback) {
                       growth_level: growth_level,
                       starred: starred
                     }
-                    questions[idx]['choice' + orderArr[0]] = resp.screens[learnable_id].multiple_choice.choices[valueArr[0]];
-                    questions[idx]['choice' + orderArr[1]] = resp.screens[learnable_id].multiple_choice.choices[valueArr[1]];
-                    questions[idx]['choice' + orderArr[2]] = resp.screens[learnable_id].multiple_choice.choices[valueArr[2]];
-                    questions[idx]['choice' + orderArr[3]] = resp.screens[learnable_id].multiple_choice.correct[0];
+                    questions[idx]['choice' + orderArr[0]] = resp.screens[learnable_id][2].choices[valueArr[0]];
+                    questions[idx]['choice' + orderArr[1]] = resp.screens[learnable_id][2].choices[valueArr[1]];
+                    questions[idx]['choice' + orderArr[2]] = resp.screens[learnable_id][2].choices[valueArr[2]];
+                    questions[idx]['choice' + orderArr[3]] = resp.screens[learnable_id][2].correct[0];
                   }
                 }
                 if (callback && this_level <= num_levels) {
@@ -397,17 +398,17 @@ function setIconStatus(status) {
 
   switch (status) {
     case 'On':
-      everthing_ok = true;
+      everything_ok = true;
       badgeBackgroundColor = '#5cb85c';
       badgeText = 'On';
       break;
     case 'Error':
-      everthing_ok = false;
+      everything_ok = false;
       badgeBackgroundColor = '#ff033e';
       badgeText = status;
       break;
     case 'Off':
-      everthing_ok = true;
+      everything_ok = true;
       badgeBackgroundColor = '#1e90ff';
       badgeText = status;
       break;

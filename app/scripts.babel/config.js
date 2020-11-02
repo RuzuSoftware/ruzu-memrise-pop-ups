@@ -2,6 +2,7 @@
 
 var alarmName = 'Ruzu';
 var spacer = '•'; //'♦';
+var urlRoot = 'https://app.memrise.com'
 
 // Options settings defauls
 var defaultCourseID = 0;

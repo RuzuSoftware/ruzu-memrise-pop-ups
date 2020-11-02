@@ -30,7 +30,7 @@ function save_options() {
 function getCourses(callback) {
 
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', 'https://www.memrise.com/ajax/courses/dashboard/?courses_filter=most_recent&offset=0&limit=20&get_review_count=false', true);
+  xhr.open('GET', urlRoot + '/ajax/courses/dashboard/?courses_filter=most_recent&offset=0&limit=8&get_review_count=false', true);
 
   xhr.onreadystatechange = function() {
 
