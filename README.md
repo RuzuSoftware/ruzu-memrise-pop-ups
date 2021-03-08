@@ -1,5 +1,7 @@
 # Ruzu Memrise Pop-ups
 
+![](media/Small%20tile.jpg)
+
 Ruzu Memrise Pop-ups is a Chrome extension that allows you to water your [Memrise](https://www.memrise.com/) plants whilst working on other important tasks by harnessing the power of desktop notifications! Questions from your chosen course will periodically pop up for you to answer.
 
 Features include:
